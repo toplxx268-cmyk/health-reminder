@@ -2,11 +2,11 @@
 
 const CACHE = 'health-reminder-v1';
 const URLS = [
-  '/',
-  '/index.html',
-  '/css/app.css',
-  '/js/app.js',
-  '/manifest.json'
+  '/health-reminder/',
+  '/health-reminder/index.html',
+  '/health-reminder/css/app.css',
+  '/health-reminder/js/app.js',
+  '/health-reminder/manifest.json'
 ];
 
 self.addEventListener('install', (event) => {
