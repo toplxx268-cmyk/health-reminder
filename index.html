@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="theme-color" content="#34C759">
+  <link rel="manifest" href="manifest.json">
+  <title>健康提醒</title>
+  <style>
+    *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+    :root{--g:#34C759;--r:#FF3B30;--o:#FF9500;--p:#AF52DE;--b:#007AFF;--bg:#F2F2F7;--card:#fff;--t:#1C1C1E;--s:#8E8E93;--sep:#C6C6C8}
+    html,body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display',sans-serif;font-size:17px;color:var(--t);background:var(--bg);-webkit-font-smoothing:antialiased;height:100%;overflow:hidden}
+
+    /* Auth */
+    #auth-box{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;padding:24px}
+    #auth-box h1{font-size:28px;margin:12px 0 4px}
+    #auth-box p.sub{font-size:14px;color:var(--s);margin-bottom:24px}
+    #auth-box input{width:100%;max-width:320px;padding:14px;font-size:16px;border:1.5px solid var(--sep);border-radius:10px;margin-bottom:10px;outline:none}
+    #auth-box input:focus{border-color:var(--g)}
+    #auth-box .btn{width:100%;max-width:320px;padding:14px;font-size:17px;font-weight:600;background:var(--g);color:#fff;border:none;border-radius:10px;cursor:pointer}
+    #auth-box .btn:active{opacity:.8}
+    #auth-box .msg{margin-top:8px;font-size:14px;color:var(--r);min-height:20px}
+
+    /* App shell */
+    #app{display:none;height:100%;flex-direction:column}
+    #topbar{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--card);border-bottom:.5px solid var(--sep);flex-shrink:0}
+    #topbar h2{font-size:18px;font-weight:600}
+    #topbar button{font-size:15px;color:var(--g);background:none;border:none;cursor:pointer}
+
+    /* Pane */
+    .pane{display:none;flex:1;overflow-y:auto;padding:12px 16px 100px}
+    .pane.on{display:block}
+
+    /* Tabs */
+    #tabs{display:flex;background:rgba(249,249,249,.94);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-top:.5px solid var(--sep);flex-shrink:0;padding-bottom:env(safe-area-inset-bottom)}
+    #tabs button{flex:1;display:flex;flex-direction:column;align-items:center;gap:1px;padding:8px 0 4px;background:none;border:none;cursor:pointer;color:var(--s);font-size:10px}
+    #tabs button.on{color:var(--g)}
+    #tabs button .i{font-size:22px}
+
+    /* Cards */
+    .card{background:var(--card);border-radius:14px;padding:14px 16px;box-shadow:0 1px 3px rgba(0,0,0,.04);margin-bottom:12px}
+    .st{font-size:15px;font-weight:600;margin:16px 0 8px}
+
+    /* Dashboard */
+    .greet{display:flex;align-items:center;justify-content:space-between}
+    .greet .t{font-size:20px;font-weight:700}
+    .greet .d{font-size:13px;color:var(--s)}
+    .prog{display:flex;align-items:center;gap:16px}
+    .ring{position:relative;width:72px;height:72px;flex-shrink:0}
+    .ring svg{transform:rotate(-90deg)}
+    .ring-bg{fill:none;stroke:#E8E8ED;stroke-width:6}
+    .ring-fg{fill:none;stroke:var(--g);stroke-width:6;stroke-linecap:round;transition:stroke-dashoffset .5s}
+    .ring-t{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:var(--g)}
+    .bar{height:4px;background:#E8E8ED;border-radius:2px;margin-top:4px;overflow:hidden}
+    .bar-f{height:100%;background:var(--g);border-radius:2px;transition:width .5s}
+
+    /* Reminder row */
+    .row{display:flex;gap:8px;margin-bottom:8px}
+    .row .tc{width:44px;text-align:center;padding-top:14px;font-size:13px;font-weight:600;flex-shrink:0}
+    .row .lc{display:flex;flex-direction:column;align-items:center;width:14px;flex-shrink:0}
+    .row .dot{width:10px;height:10px;border-radius:50%;margin-top:16px;flex-shrink:0}
+    .row .dot.done{background:var(--g)}.row .dot.past{background:#C7C7CC}.row .dot.up{background:var(--b)}
+    .row .line{width:2px;flex:1;background:#E8E8ED;min-height:20px}
+    .row .rc{flex:1;display:flex;gap:8px;padding:12px;background:var(--card);border-radius:10px;box-shadow:0 1px 3px rgba(0,0,0,.04);align-items:flex-start}
+    .row .rc .info{flex:1;min-width:0}
+    .row .rc .tt{font-size:15px;font-weight:500}.row .rc .tt.done{text-decoration:line-through;color:var(--s)}
+    .row .rc .msg{font-size:12px;color:var(--s);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .row .rc .tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+    .row .rc .tags span{font-size:11px;color:var(--s);background:#F2F2F7;padding:2px 6px;border-radius:4px}
+    .row .vlink{display:inline-flex;align-items:center;gap:3px;font-size:12px;color:#fff;background:var(--o);padding:4px 10px;border-radius:6px;text-decoration:none;margin-top:4px}
+    .row .vlink:active{opacity:.8}
+    .dbtn{font-size:13px;font-weight:500;color:#fff;background:var(--g);border:none;padding:6px 14px;border-radius:8px;cursor:pointer;white-space:nowrap}
+    .dbtn:active{opacity:.8}
+    .tblock{display:flex;gap:10px;align-items:center;background:var(--card);border-radius:14px;padding:14px;margin-bottom:8px}
+    .tblock .ind{width:4px;height:48px;background:var(--p);border-radius:2px;flex-shrink:0}
+
+    /* Settings */
+    .srow{display:flex;align-items:center;gap:10px;background:var(--card);padding:12px 14px;margin-bottom:1px}
+    .srow:first-child{border-radius:14px 14px 0 0}.srow:last-child{border-radius:0 0 14px 14px}
+    .srow .em{font-size:20px}.srow .inf{flex:1}.srow .nm{font-size:15px}.srow .tm{font-size:12px;color:var(--s)}
+    .srow .ebtn{font-size:13px;color:var(--g);background:none;border:1.5px solid var(--g);border-radius:8px;padding:5px 14px;cursor:pointer;font-weight:500;margin-right:6px}
+    .srow .ebtn:active{opacity:.7}
+
+    /* Toggle */
+    .tgl{position:relative;width:48px;height:28px;flex-shrink:0}
+    .tgl input{opacity:0;width:0;height:0}
+    .tgl .sl{position:absolute;inset:0;background:#E8E8ED;border-radius:14px;cursor:pointer;transition:.2s}
+    .tgl .sl::after{content:'';position:absolute;width:24px;height:24px;background:#fff;border-radius:50%;top:2px;left:2px;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+    .tgl input:checked+.sl{background:var(--g)}
+    .tgl input:checked+.sl::after{transform:translateX(20px)}
+
+    /* Diet */
+    .flex{display:flex;align-items:center;justify-content:space-between}
+    .flex .btn{font-size:22px;background:none;border:none;cursor:pointer;color:var(--g);font-weight:600;padding:4px 8px}
+    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+    .chk{display:flex;align-items:center;gap:8px;background:var(--card);padding:10px 12px;border-radius:10px}
+    .chk .em{font-size:16px}.chk .nm{font-size:13px;font-weight:500}.chk .fq{font-size:11px;color:var(--s)}
+    .fbar{display:flex;gap:8px;margin-bottom:12px}
+    .fitem{flex:1;text-align:center;background:var(--card);padding:10px 4px;border-radius:10px}
+    .fitem .em{font-size:22px}.fitem .nm{font-size:11px;color:var(--s)}
+    .meal{display:flex;gap:10px;background:var(--card);border-radius:10px;padding:12px;margin-bottom:8px;align-items:flex-start}
+    .meal .em{font-size:22px;min-width:40px;text-align:center}.meal .tm{font-size:11px;color:var(--s);text-align:center}
+    .meal .ct{flex:1}.meal .ct .name{font-size:14px;font-weight:600}
+    .meal .ct .tags{display:flex;flex-wrap:wrap;gap:2px;margin-top:4px}
+    .meal .ct .tags span{font-size:11px;color:var(--s);background:#F2F2F7;padding:2px 6px;border-radius:4px}
+    .meal .ct .notes{font-size:12px;color:var(--s);margin-top:2px}
+    .meal .del{font-size:14px;color:var(--r);background:none;border:none;cursor:pointer;opacity:.5;padding:4px}
+
+    .fab{display:block;width:calc(100% - 32px);margin:12px auto 0;padding:14px;background:var(--g);color:#fff;border:none;border-radius:14px;font-size:16px;font-weight:600;cursor:pointer;box-shadow:0 4px 12px rgba(52,199,89,.4)}
+    .fab:active{opacity:.8}
+    .hint{font-size:13px;color:var(--s);line-height:1.6}
+
+    /* Modal */
+    .ov{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:200;display:none;align-items:flex-end}
+    .sh{width:100%;max-height:85vh;background:var(--card);border-radius:16px 16px 0 0;display:flex;flex-direction:column;overflow:hidden;animation:up .3s}
+    .sh .hd{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:.5px solid var(--sep);flex-shrink:0}
+    .sh .hd h3{font-size:16px;font-weight:600}
+    .sh .bd{flex:1;overflow-y:auto;padding:16px}
+    .frm{margin-bottom:14px}.frm label{display:block;font-size:13px;font-weight:600;color:var(--s);margin-bottom:4px}
+    .frm input,.frm select,.frm textarea{width:100%;padding:12px;font-size:16px;border:1.5px solid var(--sep);border-radius:10px;background:#F9F9F9;outline:none}
+    .frm input:focus,.frm select:focus{border-color:var(--g);background:#fff}.frm textarea{resize:vertical;min-height:48px}
+    .frm .hint{font-size:12px;color:var(--s);margin-top:4px}
+
+    /* Food group grid */
+    .fgrid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px}
+    .fbtn{padding:8px 10px;border-radius:10px;border:1.5px solid var(--sep);background:#F9F9F9;cursor:pointer;font-size:13px;transition:all .15s;text-align:left}
+    .fbtn.sel{border-color:var(--g);background:rgba(52,199,89,.12);color:var(--g);font-weight:600}
+    .fbtn:active{opacity:.7}
+
+    .mt-sel{display:flex;gap:8px;margin-bottom:14px}
+    .mt-btn{flex:1;padding:10px;border-radius:10px;border:1.5px solid var(--sep);background:#F9F9F9;cursor:pointer;font-size:14px;text-align:center}
+    .mt-btn.sel{border-color:var(--g);background:rgba(52,199,89,.12);color:var(--g);font-weight:600}
+
+    /* Guide modals */
+    .tea-card{background:var(--card);border-radius:14px;padding:14px;margin-bottom:10px}
+    .tea-card .n{font-size:17px;font-weight:600;margin-bottom:2px}
+
+    @keyframes up{from{transform:translateY(100%)}to{transform:translateY(0)}}
+  </style>
+</head>
+<body>
+
+<!-- AUTH -->
+<div id="auth-box">
+  <div style="font-size:64px">❤️</div>
+  <h1>健康提醒</h1>
+  <p class="sub">每日健康管理 · 地中海饮食追踪</p>
+  <input type="email" id="email" placeholder="邮箱" autocomplete="email">
+  <input type="password" id="password" placeholder="密码（6位以上）">
+  <button class="btn" id="auth-btn" onclick="doAuth()">登录 / 注册</button>
+  <p class="msg" id="auth-msg"></p>
+  <p style="font-size:12px;color:var(--s);margin-top:8px">首次输入自动创建账号</p>
+</div>
+
+<!-- APP -->
+<div id="app">
+
+  <!-- Top Bar -->
+  <div id="topbar">
+    <div style="min-width:60px"></div>
+    <h2 id="top-title">今日提醒</h2>
+    <button onclick="doSignOut()">退出</button>
+  </div>
+
+  <!-- ===== DASHBOARD ===== -->
+  <div id="pane-dashboard" class="pane on">
+    <div id="dash-content"></div>
+  </div>
+
+  <!-- ===== SETTINGS ===== -->
+  <div id="pane-settings" class="pane">
+    <div style="display:flex;gap:8px;margin-bottom:16px">
+      <button class="fab" style="flex:1;background:var(--b);margin:0" onclick="showNewReminder()">＋ 新增提醒</button>
+      <button class="fab" style="flex:1;background:var(--p);margin:0" onclick="showNewBlock()">＋ 新增时间块</button>
+    </div>
+    <div class="st">日常提醒</div>
+    <div id="sett-point"></div>
+    <div class="st">间隔提醒</div>
+    <div id="sett-interval"></div>
+    <div class="st">时间块</div>
+    <div id="sett-block"></div>
+    <div class="card hint" style="margin-top:16px">
+      💡 确保浏览器通知权限已开启<br>添加到主屏幕获得原生应用体验
+    </div>
+    <div class="st">参考指南</div>
+    <button class="fab" style="background:var(--card);color:var(--t);box-shadow:0 1px 3px rgba(0,0,0,.04);margin-bottom:8px" onclick="showTeaGuide()">🍵 18种中医茶饮功效</button>
+    <button class="fab" style="background:var(--card);color:var(--t);box-shadow:0 1px 3px rgba(0,0,0,.04);margin-bottom:8px" onclick="showMedGuide()">🥗 地中海饮食指南</button>
+  </div>
+
+  <!-- ===== STATS ===== -->
+  <div id="pane-stats" class="pane">
+    <div class="st">📊 健康统计</div>
+    <div style="display:flex;gap:8px;margin-bottom:16px">
+      <button style="flex:1;padding:10px;border-radius:10px;border:1.5px solid var(--sep);background:#F9F9F9;cursor:pointer;font-size:14px" id="stat-week-btn" onclick="switchStat('week')">本周汇总</button>
+      <button style="flex:1;padding:10px;border-radius:10px;border:1.5px solid var(--sep);background:#F9F9F9;cursor:pointer;font-size:14px" id="stat-month-btn" onclick="switchStat('month')">本月汇总</button>
+    </div>
+    <div id="stats-content"></div>
+  </div>
+
+  <!-- ===== DIET ===== -->
+  <div id="pane-diet" class="pane">
+    <div id="diet-content"></div>
+    <button class="fab" onclick="showLogMeal()" style="position:sticky;bottom:80px">＋ 记录餐食</button>
+  </div>
+
+  <!-- Tabs -->
+  <div id="tabs">
+    <button class="on" onclick="goTab('dashboard')"><span class="i">🏠</span>今日</button>
+    <button onclick="goTab('diet')"><span class="i">🥗</span>饮食</button>
+    <button onclick="goTab('settings')"><span class="i">⚙️</span>设置</button>
+    <button onclick="goTab('stats')"><span class="i">📊</span>统计</button>
+  </div>
+</div>
+
+<!-- ===== MODALS ===== -->
+
+<!-- Edit Reminder -->
+<div class="ov" id="mod-edit">
+  <div class="sh">
+    <div class="hd">
+      <button style="background:none;border:none;color:var(--g);font-size:15px;cursor:pointer" onclick="closeMod('mod-edit')">取消</button>
+      <h3>编辑提醒</h3>
+      <button style="background:none;border:none;color:var(--g);font-size:15px;font-weight:600;cursor:pointer" onclick="saveEdit()">保存</button>
+    </div>
+    <div class="bd" id="edit-body"></div>
+  </div>
+</div>
+
+<!-- New Reminder -->
+<div class="ov" id="mod-new">
+  <div class="sh">
+    <div class="hd">
+      <button style="background:none;border:none;color:var(--g);font-size:15px;cursor:pointer" onclick="closeMod('mod-new')">取消</button>
+      <h3>新增提醒</h3>
+      <button style="background:none;border:none;color:var(--g);font-size:15px;font-weight:600;cursor:pointer" onclick="saveNewReminder()">创建</button>
+    </div>
+    <div class="bd" id="new-body"></div>
+  </div>
+</div>
+
+<!-- New Time Block -->
+<div class="ov" id="mod-newblock">
+  <div class="sh">
+    <div class="hd">
+      <button style="background:none;border:none;color:var(--g);font-size:15px;cursor:pointer" onclick="closeMod('mod-newblock')">取消</button>
+      <h3>新增时间块</h3>
+      <button style="background:none;border:none;color:var(--g);font-size:15px;font-weight:600;cursor:pointer" onclick="saveNewBlock()">创建</button>
+    </div>
+    <div class="bd" id="newblock-body"></div>
+  </div>
+</div>
+
+<!-- Log Meal -->
+<div class="ov" id="mod-meal">
+  <div class="sh">
+    <div class="hd">
+      <button style="background:none;border:none;color:var(--g);font-size:15px;cursor:pointer" onclick="closeMod('mod-meal')">取消</button>
+      <h3>记录餐食</h3>
+      <button style="background:none;border:none;color:var(--g);font-size:15px;font-weight:600;cursor:pointer" onclick="saveMeal()">保存</button>
+    </div>
+    <div class="bd" id="meal-body"></div>
+  </div>
+</div>
+
+<!-- Tea Guide -->
+<div class="ov" id="mod-tea">
+  <div class="sh" style="height:100%;max-height:100%;border-radius:0">
+    <div class="hd">
+      <h3>🍵 中医茶饮功效</h3>
+      <button style="background:none;border:none;color:var(--g);font-size:15px;cursor:pointer" onclick="closeMod('mod-tea')">关闭</button>
+    </div>
+    <div class="bd" id="tea-body"></div>
+  </div>
+</div>
+
+<!-- Med Guide -->
+<div class="ov" id="mod-med">
+  <div class="sh" style="height:100%;max-height:100%;border-radius:0">
+    <div class="hd">
+      <h3>🥗 地中海饮食指南</h3>
+      <button style="background:none;border:none;color:var(--g);font-size:15px;cursor:pointer" onclick="closeMod('mod-med')">关闭</button>
+    </div>
+    <div class="bd" id="med-body"></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
