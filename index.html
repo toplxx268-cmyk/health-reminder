@@ -173,16 +173,18 @@
   <div id="pane-settings" class="pane">
     <div style="display:flex;gap:8px;margin-bottom:16px">
       <button class="fab" style="flex:1;background:var(--b);margin:0" onclick="showNewReminder()">＋ 新增提醒</button>
-      <button class="fab" style="flex:1;background:var(--p);margin:0" onclick="showNewBlock()">＋ 新增时间块</button>
+      <button class="fab" style="flex:1;background:var(--p);margin:0" onclick="showNewBlock()">＋ 新增任务块</button>
     </div>
     <div class="st">日常提醒</div>
     <div id="sett-point"></div>
     <div class="st">间隔提醒</div>
     <div id="sett-interval"></div>
-    <div class="st">时间块</div>
+    <div class="st">任务块</div>
     <div id="sett-block"></div>
     <div class="card hint" style="margin-top:16px">
-      💡 确保浏览器通知权限已开启<br>添加到主屏幕获得原生应用体验
+      💡 添加到主屏幕获得原生应用体验<br>
+      📅 仪表盘底部可导出 .ics 文件导入苹果日历<br>
+      ⚠️ 网页版无法直接双向同步日历，修改后需重新导出
     </div>
     <div class="st">参考指南</div>
     <button class="fab" style="background:var(--card);color:var(--t);box-shadow:0 1px 3px rgba(0,0,0,.04);margin-bottom:8px" onclick="showTeaGuide()">🍵 18种中医茶饮功效</button>
@@ -245,7 +247,7 @@
   <div class="sh">
     <div class="hd">
       <button style="background:none;border:none;color:var(--g);font-size:15px;cursor:pointer" onclick="closeMod('mod-newblock')">取消</button>
-      <h3>新增时间块</h3>
+      <h3>新增任务块</h3>
       <button style="background:none;border:none;color:var(--g);font-size:15px;font-weight:600;cursor:pointer" onclick="saveNewBlock()">创建</button>
     </div>
     <div class="bd" id="newblock-body"></div>

@@ -161,14 +161,14 @@ function renderDash() {
   const greet = h<6?'夜深了 🌙':h<12?'早上好 ☀️':h<14?'中午好 🌤️':h<18?'下午好 🌅':'晚上好 🌆';
   const dstr = now.toLocaleDateString('zh-CN',{year:'numeric',month:'long',day:'numeric',weekday:'long'});
 
-  const enabled = reminders.filter(r => !_isBlock(r));
-  const total = enabled.length;
+  const enabled = reminders.filter(r => r.is_enabled);
   const doneIds = new Set(completions.map(c => c.reminder_id));
   const done = enabled.filter(r => doneIds.has(r.id)).length;
+  const total = enabled.length;
   const pct = total>0 ? done/total : 0;
 
   const blocks = reminders.filter(r => _isBlock(r) && r.is_enabled);
-  const points = enabled.filter(r => r.is_enabled).sort((a,b)=>a.time.localeCompare(b.time));
+  const points = enabled.filter(r => !_isBlock(r)).sort((a,b)=>a.time.localeCompare(b.time));
 
   let html = '';
 
@@ -185,13 +185,19 @@ function renderDash() {
     +`<div style="font-size:13px;color:var(--s)">已完成 ${done}/${total} 项</div>`
     +`<div class="bar"><div class="bar-f" style="width:${pct*100}%"></div></div></div></div>`;
 
-  // time blocks
+  // task blocks
   if (blocks.length > 0) {
-    html += `<div class="st">📅 时间块</div>`;
+    html += `<div class="st">📅 任务块</div>`;
     blocks.forEach(r => {
       const s = (r.time||'09:00').slice(0,5);
       const e = (r.active_hours_end||'12:00').slice(0,5);
-      html += `<div class="tblock"><div class="ind"></div><div style="flex:1"><div>📝 ${r.title}</div><div style="font-size:12px;color:var(--s)">${s} – ${e}</div></div></div>`;
+      const isDone = doneIds.has(r.id);
+      html += `<div class="tblock"><div class="ind"></div><div style="flex:1"><div${isDone?' style="text-decoration:line-through;color:var(--s)"':''}>📝 ${r.title}</div><div style="font-size:12px;color:var(--s)">${s} – ${e}</div></div>`
+        +`<div style="flex-shrink:0">`
+        +(isDone
+          ?`<button style="font-size:20px;color:var(--g);background:none;border:none;cursor:pointer;padding:4px" onclick="toggleComplete('${r.id}',true)">✓</button>`
+          :`<button class="dbtn" onclick="toggleComplete('${r.id}',false)">完成</button>`)
+        +`</div></div>`;
     });
   }
 
@@ -224,11 +230,57 @@ function renderDash() {
   });
 
   html += `<button style="display:block;margin:16px auto 0;font-size:13px;color:var(--s);background:none;border:none;cursor:pointer" onclick="resetToday()">重置今日状态</button>`;
+  html += `<button style="display:block;margin:8px auto 0;font-size:13px;color:var(--b);background:none;border:none;cursor:pointer" onclick="exportCalendar()">📅 导出到苹果日历</button>`;
 
   document.getElementById('dash-content').innerHTML = html;
 }
 
+// ─── Calendar Export ───
+function exportCalendar() {
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const enabled = reminders.filter(r => r.is_enabled);
+
+  let ics = 'BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//HealthReminder//CN\r\nCALSCALE:GREGORIAN\r\nMETHOD:PUBLISH\r\n';
+
+  enabled.forEach(r => {
+    const [h,m] = r.time.split(':').map(Number);
+    const dtStart = new Date(todayStart);
+    dtStart.setHours(h, m, 0);
+    const dtEnd = new Date(dtStart);
+    dtEnd.setMinutes(dtStart.getMinutes() + (r.active_hours_end ? 60 : 30));
+
+    const fmt = (d) => d.toISOString().replace(/[-:]/g,'').replace(/\.\d{3}/,'');
+
+    ics += 'BEGIN:VEVENT\r\n';
+    ics += `UID:${r.id}@health-reminder\r\n`;
+    ics += `DTSTART:${fmt(dtStart)}\r\n`;
+    ics += `DTEND:${fmt(dtEnd)}\r\n`;
+    ics += `SUMMARY:${emoji(r.type)} ${r.title}\r\n`;
+    ics += `DESCRIPTION:${r.message||''}\r\n`;
+    if (r.interval_minutes) {
+      ics += `RRULE:FREQ=MINUTELY;INTERVAL=${r.interval_minutes}\r\n`;
+    }
+    ics += 'END:VEVENT\r\n';
+  });
+
+  ics += 'END:VCALENDAR\r\n';
+
+  const blob = new Blob([ics], {type:'text/calendar;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = '健康提醒日历_' + ts() + '.ics';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+
+  alert('.ics 文件已下载！\\n\\n打开文件 → 自动导入 Apple 日历\\n\\n💡 提示：网页版无法直接同步日历，\\n每次修改提醒后需要重新导出。\\n建议添加到主屏幕后每天导出一次。');
+}
+
 function _isBlock(r) { return r.type==='writing' || (r.active_hours_end && !r.interval_minutes); }
+function _isInterval(r) { return r.interval_minutes && r.interval_minutes > 0; }
 
 // ─── Settings ───
 function renderSett() {
@@ -537,7 +589,7 @@ function showNewBlock() {
     interval_minutes: null, video_link: null, selected_tea_key: null,
   };
   document.getElementById('newblock-body').innerHTML = `
-    <div class="frm"><label>时间块名称</label><input type="text" placeholder="例如：写论文、午休" onchange="newBlock.title=this.value"></div>
+    <div class="frm"><label>任务块名称</label><input type="text" placeholder="例如：写论文、午休" onchange="newBlock.title=this.value"></div>
     <div class="frm"><label>开始时间</label><input type="time" value="09:00" onchange="newBlock.time=this.value+':00';newBlock.active_hours_start=this.value+':00'"></div>
     <div class="frm"><label>结束时间</label><input type="time" value="12:00" onchange="newBlock.active_hours_end=this.value+':00'"></div>
     <div class="frm"><label>提醒内容</label><textarea onchange="newBlock.message=this.value" rows="2" placeholder="显示在仪表盘上"></textarea></div>
