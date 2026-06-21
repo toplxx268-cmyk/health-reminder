@@ -7,10 +7,10 @@
 create table reminders (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references auth.users not null default auth.uid(),
-  type text not null check (type in (
-    'wakeUp','medication','exercise','tea','diet',
-    'eyeCare','sedentary','writing','bedtime','custom'
-  )),
+  type text not null check (
+    type in ('wakeUp','medication','exercise','tea','diet','eyeCare','sedentary','writing','bedtime','custom')
+    OR type ~ '^(wakeUp|medication|exercise|tea|diet|eyeCare|sedentary|writing|bedtime|custom)_\d+$'
+  ),
   title text not null,
   is_enabled boolean default true,
   time time not null,
