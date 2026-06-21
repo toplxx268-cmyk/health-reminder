@@ -1,6 +1,6 @@
 // 健康提醒 — Service Worker (offline cache + PWA)
 
-const CACHE = 'health-reminder-v1';
+const CACHE = 'health-reminder-v2';
 const URLS = [
   '/health-reminder/',
   '/health-reminder/index.html',
@@ -19,7 +19,13 @@ self.addEventListener('install', (event) => {
 });
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil(clients.claim());
+  event.waitUntil(
+    caches.keys().then(keys => {
+      return Promise.all(
+        keys.filter(key => key !== CACHE).map(key => caches.delete(key))
+      );
+    }).then(() => clients.claim())
+  );
 });
 
 self.addEventListener('fetch', (event) => {
