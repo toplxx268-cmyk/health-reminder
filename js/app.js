@@ -427,7 +427,7 @@ function renderDiet() {
     const t = new Date(e.time);
     const ti = t.toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'});
     const mi = MT[e.meal_type]||{em:'🍽️',nm:e.meal_type};
-    h += `<div class="meal"><div><div class="em">${mi.em}</div><div class="tm">${ti}</div></div><div class="ct"><div class="name">${mi.nm}</div><div class="tags">${(e.food_groups||[]).map(g=>`<span>${(FG[g]||{}).em||''} ${(FG[g]||{}).nm||g}</span>`).join('')}</div>${e.notes?`<div class="notes">${e.notes}</div>`:''}</div><button class="del" onclick="delMeal('${e.id}')">🗑️</button></div>`;
+    h += `<div class="meal"><div><div class="em">${mi.em}</div><div class="tm">${ti}</div></div><div class="ct"><div class="name">${mi.nm}</div><div class="tags">${(e.food_groups||[]).map(g=>`<span>${(FG[g]||{}).em||''} ${(FG[g]||{}).nm||g}</span>`).join('')}</div>${e.notes?`<div class="notes">${e.notes}</div>`:''}</div><button class="del" onclick="editMeal('${e.id}')" style="font-size:16px;background:none;border:none;cursor:pointer;padding:4px;opacity:.5">✏️</button><button class="del" onclick="delMeal('${e.id}')">🗑️</button></div>`;
   });
 
   document.getElementById('diet-content').innerHTML = h;
@@ -452,6 +452,19 @@ async function loadMeals() {
   meals = data || [];
 }
 
+let _editingMealId = null;
+
+function editMeal(id) {
+  const e = meals.find(m => m.id === id);
+  if (!e) return;
+  _editingMealId = id;
+  logMealType = e.meal_type;
+  logGroups = new Set(e.food_groups || []);
+  logNotes = e.notes || '';
+  renderLogForm();
+  document.getElementById('mod-meal').style.display = 'flex';
+}
+
 async function delMeal(id) {
   await supabase.from('meal_entries').delete().eq('id',id);
   meals = meals.filter(e => e.id!==id);
@@ -460,6 +473,7 @@ async function delMeal(id) {
 
 // ─── Log Meal ───
 function showLogMeal() {
+  _editingMealId = null;
   logMealType = 'lunch'; logGroups = new Set(); logNotes = '';
   renderLogForm();
   document.getElementById('mod-meal').style.display = 'flex';
@@ -490,10 +504,19 @@ function togFG(k) { if (logGroups.has(k)) logGroups.delete(k); else logGroups.ad
 
 async function saveMeal() {
   if (logGroups.size===0) return;
-  await supabase.from('meal_entries').insert({
-    meal_type: logMealType, date: ts(dietDate), time: new Date().toISOString(),
-    food_groups: Array.from(logGroups), notes: logNotes,
-  });
+  if (_editingMealId) {
+    await supabase.from('meal_entries').update({
+      meal_type: logMealType,
+      food_groups: Array.from(logGroups),
+      notes: logNotes,
+    }).eq('id', _editingMealId);
+  } else {
+    await supabase.from('meal_entries').insert({
+      meal_type: logMealType, date: ts(dietDate), time: new Date().toISOString(),
+      food_groups: Array.from(logGroups), notes: logNotes,
+    });
+  }
+  _editingMealId = null;
   closeMod('mod-meal');
   await loadMeals();
   renderDiet();
