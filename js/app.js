@@ -228,14 +228,14 @@ function renderDash() {
   document.getElementById('dash-content').innerHTML = html;
 }
 
-function _isBlock(r) { return r.type==='writing'; }
+function _isBlock(r) { return r.type==='writing' || (r.active_hours_end && !r.interval_minutes); }
 
 // ─── Settings ───
 function renderSett() {
   const point = [], inter = [], blk = [];
   reminders.forEach(r => {
     if (_isBlock(r)) blk.push(r);
-    else if (r.type==='eyeCare'||r.type==='sedentary') inter.push(r);
+    else if (r.interval_minutes && r.interval_minutes > 0) inter.push(r);
     else point.push(r);
   });
 
@@ -283,7 +283,19 @@ function renderEditForm() {
   if (!r) return;
   let h = `<div class="frm"><label>启用</label>`
     +`<label class="tgl" style="display:inline-block"><input type="checkbox" ${r.is_enabled?'checked':''} onchange="editing.is_enabled=this.checked"><span class="sl"></span></label></div>`
-    +`<div class="frm"><label>时间</label><input type="time" value="${r.time.slice(0,5)}" onchange="editing.time=this.value+':00'"></div>`
+    +`<div class="frm"><label>开始时间</label><input type="time" value="${r.time.slice(0,5)}" onchange="editing.time=this.value+':00'"></div>`
+    +`<div class="frm"><label>结束时间（可选）</label><input type="time" value="${(r.active_hours_end||'').slice(0,5)}" onchange="var v=this.value;editing.active_hours_end=v?v+':00':null"><div class="hint">设置后会在结束时也发提醒</div></div>`
+    +`<div class="frm"><label>重复间隔</label><select onchange="editing.interval_minutes=this.value?parseInt(this.value):null">
+      <option value="" ${!r.interval_minutes?'selected':''}>不重复</option>
+      <option value="5" ${r.interval_minutes===5?'selected':''}>5 分钟</option>
+      <option value="10" ${r.interval_minutes===10?'selected':''}>10 分钟</option>
+      <option value="20" ${r.interval_minutes===20?'selected':''}>20 分钟</option>
+      <option value="30" ${r.interval_minutes===30?'selected':''}>30 分钟</option>
+      <option value="45" ${r.interval_minutes===45?'selected':''}>45 分钟</option>
+      <option value="60" ${r.interval_minutes===60?'selected':''}>60 分钟</option>
+      <option value="90" ${r.interval_minutes===90?'selected':''}>90 分钟</option>
+      <option value="120" ${r.interval_minutes===120?'selected':''}>120 分钟</option>
+    </select><div class="hint">设置后在活跃时段内每隔所选时间重复提醒</div></div>`
     +`<div class="frm"><label>提醒内容</label><textarea onchange="editing.message=this.value" rows="2">${r.message||''}</textarea></div>`;
 
   if (r.type==='exercise') {
@@ -305,6 +317,9 @@ async function saveEdit() {
   const r = editing;
   await supabase.from('reminders').update({
     is_enabled: r.is_enabled, time: r.time, message: r.message,
+    interval_minutes: r.interval_minutes||null,
+    active_hours_end: r.active_hours_end||null,
+    active_hours_start: r.interval_minutes ? r.time : null,
     video_link: r.video_link||null, selected_tea_key: r.selected_tea_key||null,
   }).eq('id', r.id);
   Object.assign(reminders.find(x=>x.id===r.id), r);
