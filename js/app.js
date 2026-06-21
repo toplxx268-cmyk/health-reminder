@@ -62,6 +62,8 @@ async function doAuth() {
 
   if (data?.user) {
     user = data.user;
+    document.getElementById('drawer-email').textContent = user.email || '';
+    document.getElementById('drawer-name').textContent = user.email?.split('@')[0] || '用户';
     document.getElementById('auth-box').style.display = 'none';
     document.getElementById('app').style.display = 'flex';
     await loadAll();
@@ -533,6 +535,35 @@ function showMedGuide() {
 // ─── Modal Utils ───
 function closeMod(id) { document.getElementById(id).style.display = 'none'; }
 
+// ─── Drawer ───
+function toggleDrawer() {
+  const drawer = document.getElementById('drawer');
+  const overlay = document.getElementById('drawer-overlay');
+  const open = drawer.style.transform === 'translateX(0px)';
+  if (open) { closeDrawer(); return; }
+  document.getElementById('drawer-email').textContent = user?.email || '';
+  document.getElementById('drawer-name').textContent = user?.email?.split('@')[0] || '用户';
+  overlay.style.display = 'block';
+  drawer.style.transform = 'translateX(0px)';
+}
+
+function closeDrawer() {
+  document.getElementById('drawer-overlay').style.display = 'none';
+  document.getElementById('drawer').style.transform = 'translateX(-100%)';
+}
+
+// ─── Refresh ───
+async function refreshApp() {
+  await loadAll();
+  const currentPane = document.querySelector('.pane.on');
+  if (currentPane) {
+    if (currentPane.id === 'pane-dashboard') renderDash();
+    if (currentPane.id === 'pane-settings') renderSett();
+    if (currentPane.id === 'pane-diet') renderDiet();
+    if (currentPane.id === 'pane-stats') renderStats();
+  }
+}
+
 // ─── New Reminder ───
 function showNewReminder() {
   newReminder = {
@@ -850,6 +881,8 @@ const TEAS = [
   const { data: { session } } = await supabase.auth.getSession();
   if (session?.user) {
     user = session.user;
+    document.getElementById('drawer-email').textContent = user.email || '';
+    document.getElementById('drawer-name').textContent = user.email?.split('@')[0] || '用户';
     document.getElementById('auth-box').style.display = 'none';
     document.getElementById('app').style.display = 'flex';
     await loadAll();
