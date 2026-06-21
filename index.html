@@ -157,6 +157,9 @@
 <!-- APP -->
 <div id="app">
 
+  <!-- Toast fallback notifications -->
+  <div id="toast" style="position:fixed;top:60px;left:16px;right:16px;background:#1C1C1E;color:#fff;padding:14px 18px;border-radius:12px;font-size:15px;z-index:500;opacity:0;transform:translateY(-40px);transition:all .3s;white-space:pre-line;pointer-events:none;box-shadow:0 8px 30px rgba(0,0,0,.3)"></div>
+
   <!-- Top Bar -->
   <div id="topbar">
     <button id="avatar-btn" onclick="toggleDrawer()" style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--g),#30D158);color:#fff;font-weight:700;font-size:16px;border:none;cursor:pointer;flex-shrink:0">👤</button>
@@ -181,6 +184,10 @@
 
   <!-- ===== DASHBOARD ===== -->
   <div id="pane-dashboard" class="pane on">
+    <div id="notif-banner" style="display:none;margin:12px 16px 0;padding:12px 14px;background:#FFF3CD;border-radius:10px;font-size:14px;text-align:center">
+      🔔 提醒通知未开启
+      <button onclick="enableNotifications()" style="margin-left:8px;padding:6px 12px;background:var(--g);color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer">立即开启</button>
+    </div>
     <div id="dash-content"></div>
   </div>
 

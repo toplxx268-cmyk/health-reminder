@@ -27,8 +27,9 @@ function baseType(t) {
   return (t||'').replace(/_\d+$/, '');
 }
 function emoji(t) {
+  const b = baseType(t);
   const m = { wakeUp:'☀️', medication:'💊', exercise:'🏃', tea:'🍵', diet:'🥗', eyeCare:'👀', sedentary:'🚶', writing:'📝', bedtime:'😴' };
-  return m[baseType(t)]||'⏰';
+  return m[b] || (b && b.length <= 4 ? b : '⏰');
 }
 
 function teaName(k) {
@@ -309,6 +310,7 @@ function renderSettGroup(elId, items) {
         <div class="tm">${r.time.slice(0,5)}${r.interval_minutes?' · 每'+r.interval_minutes+'分钟':''}</div>
       </div>
       <button class="ebtn" onclick="openEdit('${r.id}')">编辑</button>
+      <button class="ebtn" onclick="deleteReminder('${r.id}')" style="color:var(--r);border-color:var(--r);margin-left:4px">删除</button>
       <label class="tgl">
         <input type="checkbox" ${r.is_enabled?'checked':''} onchange="toggleEn('${r.id}',this.checked)">
         <span class="sl"></span>
@@ -321,6 +323,16 @@ async function toggleEn(id, on) {
   await supabase.from('reminders').update({is_enabled:on}).eq('id',id);
   const r = reminders.find(x => x.id===id);
   if (r) r.is_enabled = on;
+}
+
+async function deleteReminder(id) {
+  if (!confirm('确定删除这个提醒吗？此操作不可恢复。')) return;
+  const { error } = await supabase.from('reminders').delete().eq('id', id);
+  if (error) { alert('删除失败: ' + error.message); return; }
+  reminders = reminders.filter(r => r.id !== id);
+  renderSett();
+  const cp = document.querySelector('.pane.on');
+  if (cp && cp.id === 'pane-dashboard') renderDash();
 }
 
 // ─── Edit Reminder ───
@@ -337,6 +349,8 @@ function renderEditForm() {
   if (!r) return;
   let h = `<div class="frm"><label>启用</label>`
     +`<label class="tgl" style="display:inline-block"><input type="checkbox" ${r.is_enabled?'checked':''} onchange="editing.is_enabled=this.checked"><span class="sl"></span></label></div>`
+    +`<div class="frm"><label>图标</label><input type="text" value="${emoji(r.type)}" maxlength="4" onchange="var em=this.value||'⏰';editing._newEmoji=em" style="font-size:24px;width:60px;text-align:center"></div>`
+    +`<div class="frm"><label>提醒名称</label><input type="text" value="${r.title}" onchange="editing.title=this.value"></div>`
     +`<div class="frm"><label>开始时间</label><input type="time" value="${r.time.slice(0,5)}" onchange="editing.time=this.value+':00'"></div>`
     +`<div class="frm"><label>结束时间（可选）</label><input type="time" value="${(r.active_hours_end||'').slice(0,5)}" onchange="var v=this.value;editing.active_hours_end=v?v+':00':null"><div class="hint">设置后会在结束时也发提醒</div></div>`
     +`<div class="frm"><label>重复间隔</label><select onchange="editing.interval_minutes=this.value?parseInt(this.value):null">
@@ -369,14 +383,30 @@ function renderEditForm() {
 async function saveEdit() {
   if (!editing) return;
   const r = editing;
+  // handle emoji change: update type prefix
+  let newType = r.type;
+  if (r._newEmoji && r._newEmoji !== emoji(r.type)) {
+    const m = r.type.match(/^(.+?)(_\d+)?$/);
+    if (m && m[2]) {
+      newType = r._newEmoji + m[2]; // keep timestamp suffix
+    } else {
+      newType = r._newEmoji; // preset type, replace entirely
+    }
+  }
   await supabase.from('reminders').update({
+    type: newType,
     is_enabled: r.is_enabled, time: r.time, message: r.message,
+    title: r.title,
     interval_minutes: r.interval_minutes||null,
     active_hours_end: r.active_hours_end||null,
     active_hours_start: r.interval_minutes ? r.time : null,
     video_link: r.video_link||null, selected_tea_key: r.selected_tea_key||null,
   }).eq('id', r.id);
-  Object.assign(reminders.find(x=>x.id===r.id), r);
+  const local = reminders.find(x=>x.id===r.id);
+  if (local) {
+    Object.assign(local, r);
+    local.type = newType;
+  }
   closeMod('mod-edit');
   renderSett();
 }
@@ -596,13 +626,7 @@ function showNewReminder() {
   };
   document.getElementById('new-body').innerHTML = `
     <div class="frm"><label>提醒名称</label><input type="text" placeholder="例如：喝水提醒" onchange="newReminder.title=this.value"></div>
-    <div class="frm"><label>图标</label><select onchange="newReminder.type=this.value">
-      <option value="custom">⏰ 自定义</option><option value="exercise">🏃 运动</option>
-      <option value="tea">🍵 泡茶</option><option value="medication">💊 吃药</option>
-      <option value="diet">🥗 饮食</option><option value="eyeCare">👀 护眼</option>
-      <option value="sedentary">🚶 久坐</option><option value="wakeUp">☀️ 起床</option>
-      <option value="bedtime">😴 睡觉</option><option value="writing">📝 写作</option>
-    </select></div>
+    <div class="frm"><label>图标（可输入任意emoji）</label><input type="text" placeholder="例如：💧" maxlength="4" value="⏰" onchange="newReminder.type=this.value||'custom'" style="font-size:24px;width:60px;text-align:center"></div>
     <div class="frm"><label>时间</label><input type="time" value="12:00" onchange="newReminder.time=this.value+':00'"></div>
     <div class="frm"><label>提醒内容</label><textarea onchange="newReminder.message=this.value" rows="2" placeholder="显示在通知和仪表盘上"></textarea></div>
     <div class="frm"><label>重复间隔（可选）</label><select onchange="newReminder.interval_minutes=this.value?parseInt(this.value):null">
@@ -657,7 +681,7 @@ async function saveNewBlock() {
   if (!newBlock.title.trim()) { alert('请输入任务名称'); return; }
   const r = newBlock;
   const { data, error } = await supabase.from('reminders').insert({
-    user_id: user.id, type: 'writing', title: r.title.trim(),
+    user_id: user.id, type: 'writing_' + Date.now(), title: r.title.trim(),
     is_enabled: true, time: r.time, message: r.message || r.title,
     active_hours_start: r.active_hours_start, active_hours_end: r.active_hours_end,
   }).select();
@@ -904,17 +928,43 @@ const TEAS = [
 // ─── Notifications ───
 let notifiedKeys = new Set(); // track already-fired keys for today (date-rid-hh:mm)
 
-function requestNotifPermission() {
-  if (!('Notification' in window)) return;
-  if (Notification.permission === 'default') {
-    Notification.requestPermission();
-  }
+async function requestNotifPermission() {
+  if (!('Notification' in window)) return 'unsupported';
+  if (Notification.permission === 'granted') return 'granted';
+  if (Notification.permission === 'denied') return 'denied';
+  try {
+    const result = await Notification.requestPermission();
+    return result; // 'granted' | 'denied' | 'default'
+  } catch(e) { return 'error'; }
+}
+
+function showToast(msg) {
+  // in-app fallback when system notifications unavailable
+  const el = document.getElementById('toast');
+  if (!el) return;
+  el.textContent = msg;
+  el.style.opacity = '1';
+  el.style.transform = 'translateY(0)';
+  clearTimeout(el._tid);
+  el._tid = setTimeout(() => {
+    el.style.opacity = '0';
+    el.style.transform = 'translateY(-40px)';
+  }, 4000);
 }
 
 function pad(n) { return String(n).padStart(2,'0'); }
 
+function fireNotification(title, body, key) {
+  try {
+    if ('Notification' in window && Notification.permission === 'granted') {
+      new Notification(title, { body, tag: key, requireInteraction: true, vibrate: [200,100,200] });
+    }
+  } catch(e) { /* silent */ }
+  // always show in-app toast as backup
+  showToast(title + '\n' + body);
+}
+
 function checkAndFireNotifications() {
-  if (!('Notification' in window) || Notification.permission !== 'granted') return;
   if (reminders.length === 0) return;
 
   const now = new Date();
@@ -932,14 +982,14 @@ function checkAndFireNotifications() {
   const enabled = reminders.filter(r => r.is_enabled);
 
   enabled.forEach(r => {
-    const t5 = (r.time||'').slice(0,5); // normalize to HH:MM
+    const t5 = (r.time||'').slice(0,5);
 
     // task blocks — alert at start time
     if (_isBlock(r)) {
       const key = `${today}-${r.id}-${t5}`;
       if (!notifiedKeys.has(key) && curTime === t5) {
         notifiedKeys.add(key);
-        new Notification(`📅 ${r.title}`, { body: r.message, icon: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"%3E%3Ctext y=".9em" font-size="90"%3E📅%3C/text%3E%3C/svg%3E', tag: key });
+        fireNotification('📅 ' + r.title, r.message, key);
       }
       return;
     }
@@ -950,7 +1000,6 @@ function checkAndFireNotifications() {
       const end = (r.active_hours_end||'23:59').slice(0,5);
       if (curTime < start || curTime > end) return;
 
-      // fire at interval boundaries
       const [sh, sm] = start.split(':').map(Number);
       const startMin = sh * 60 + sm;
       const nowMin = now.getHours() * 60 + now.getMinutes();
@@ -959,7 +1008,7 @@ function checkAndFireNotifications() {
         const key = `${today}-${r.id}-${curTime}`;
         if (!notifiedKeys.has(key)) {
           notifiedKeys.add(key);
-          new Notification(emoji(r.type) + ' ' + r.title, { body: r.message, icon: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"%3E%3Ctext y=".9em" font-size="90"%3E🔔%3C/text%3E%3C/svg%3E', tag: key });
+          fireNotification(emoji(r.type) + ' ' + r.title, r.message, key);
         }
       }
       return;
@@ -969,17 +1018,38 @@ function checkAndFireNotifications() {
     const key = `${today}-${r.id}-${t5}`;
     if (!notifiedKeys.has(key) && curTime === t5) {
       notifiedKeys.add(key);
-      new Notification(emoji(r.type) + ' ' + r.title, { body: r.message, icon: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"%3E%3Ctext y=".9em" font-size="90"%3E🔔%3C/text%3E%3C/svg%3E', tag: key });
+      fireNotification(emoji(r.type) + ' ' + r.title, r.message, key);
     }
   });
 }
 
 let _notifInterval = null;
 function startNotificationLoop() {
-  requestNotifPermission();
   if (_notifInterval) clearInterval(_notifInterval);
-  _notifInterval = setInterval(checkAndFireNotifications, 30000); // every 30s
-  checkAndFireNotifications(); // immediate first check
+  _notifInterval = setInterval(checkAndFireNotifications, 30000);
+  updateNotifBanner();
+}
+
+async function enableNotifications() {
+  const result = await requestNotifPermission();
+  if (result === 'granted') {
+    showToast('✅ 通知已开启！');
+  } else if (result === 'denied') {
+    alert('通知权限被拒绝。\\n请在浏览器设置中允许通知。');
+  } else {
+    alert('当前浏览器不支持系统通知。\\n将使用页内提醒代替。');
+  }
+  updateNotifBanner();
+}
+
+function updateNotifBanner() {
+  const banner = document.getElementById('notif-banner');
+  if (!banner) return;
+  if (!('Notification' in window) || Notification.permission === 'granted') {
+    banner.style.display = 'none';
+  } else {
+    banner.style.display = 'block';
+  }
 }
 
 // ─── On load, check for existing session ───
