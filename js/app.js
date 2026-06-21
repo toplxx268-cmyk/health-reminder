@@ -85,10 +85,7 @@ async function loadAll() {
   // reminders
   let { data } = await supabase.from('reminders').select('*').order('time');
   if (data && data.length > 0) {
-    // dedup
-    const seen = {};
-    data.forEach(r => { seen[r.type] = r; });
-    reminders = Object.values(seen).sort((a,b) => a.time.localeCompare(b.time));
+    reminders = data.sort((a,b) => a.time.localeCompare(b.time));
   } else {
     await insertDefaults();
   }
@@ -120,9 +117,7 @@ async function insertDefaults() {
   ];
   const { data } = await supabase.from('reminders').insert(defs).select();
   if (data && data.length > 0) {
-    const seen = {};
-    data.forEach(r => { seen[r.type] = r; });
-    reminders = Object.values(seen).sort((a,b) => a.time.localeCompare(b.time));
+    reminders = data.sort((a,b) => a.time.localeCompare(b.time));
   }
 }
 
@@ -618,8 +613,10 @@ function showNewReminder() {
 async function saveNewReminder() {
   if (!newReminder.title.trim()) { alert('请输入提醒名称'); return; }
   const r = newReminder;
+  // 自定义类型加时间戳后缀，避免唯一索引冲突
+  const finalType = r.type === 'custom' ? 'custom_' + Date.now() : r.type;
   const { data, error } = await supabase.from('reminders').insert({
-    user_id: user.id, type: r.type, title: r.title.trim(),
+    user_id: user.id, type: finalType, title: r.title.trim(),
     is_enabled: true, time: r.time, message: r.message || r.title,
     interval_minutes: r.interval_minutes, video_link: r.video_link||null,
     selected_tea_key: r.selected_tea_key||null,
