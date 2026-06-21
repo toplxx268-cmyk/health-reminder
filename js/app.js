@@ -68,6 +68,7 @@ async function doAuth() {
     document.getElementById('app').style.display = 'flex';
     await loadAll();
     goTab('dashboard');
+    startNotificationLoop();
   }
   btn.textContent = '登录 / 注册'; btn.disabled = false;
 }
@@ -899,8 +900,93 @@ const TEAS = [
   {key:'hibiscus',name:'洛神花茶',englishName:'Hibiscus Tea',nature:'凉',taste:'酸',meridians:'肺、胃',effects:['生津止渴','降血压','清热解暑','促进消化','美容养颜'],description:'汤色红宝石，酸甜口感。富含维生素C和花青素。',suitableFor:'高血压、夏季暑热、食欲不振者',caution:'胃酸过多者不宜空腹；孕妇慎用'},
 ];
 
+// ─── Notifications ───
+let notifiedKeys = new Set(); // track already-fired keys for today (date-rid-hh:mm)
+
+function requestNotifPermission() {
+  if (!('Notification' in window)) return;
+  if (Notification.permission === 'default') {
+    Notification.requestPermission();
+  }
+}
+
+function pad(n) { return String(n).padStart(2,'0'); }
+
+function checkAndFireNotifications() {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  if (reminders.length === 0) return;
+
+  const now = new Date();
+  const today = ts(now);
+  const hh = pad(now.getHours());
+  const mm = pad(now.getMinutes());
+  const curTime = hh + ':' + mm;
+
+  // reset notifiedKeys if date changed
+  const trackedDate = notifiedKeys.values().next().value?.split('-').slice(0,3).join('-') || '';
+  if (trackedDate && !trackedDate.startsWith(today)) {
+    notifiedKeys.clear();
+  }
+
+  const enabled = reminders.filter(r => r.is_enabled);
+
+  enabled.forEach(r => {
+    const t5 = (r.time||'').slice(0,5); // normalize to HH:MM
+
+    // task blocks — alert at start time
+    if (_isBlock(r)) {
+      const key = `${today}-${r.id}-${t5}`;
+      if (!notifiedKeys.has(key) && curTime === t5) {
+        notifiedKeys.add(key);
+        new Notification(`📅 ${r.title}`, { body: r.message, icon: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"%3E%3Ctext y=".9em" font-size="90"%3E📅%3C/text%3E%3C/svg%3E', tag: key });
+      }
+      return;
+    }
+
+    // interval reminders
+    if (r.interval_minutes) {
+      const start = (r.active_hours_start||r.time||'09:00').slice(0,5);
+      const end = (r.active_hours_end||'23:59').slice(0,5);
+      if (curTime < start || curTime > end) return;
+
+      // fire at interval boundaries
+      const [sh, sm] = start.split(':').map(Number);
+      const startMin = sh * 60 + sm;
+      const nowMin = now.getHours() * 60 + now.getMinutes();
+      const diff = nowMin - startMin;
+      if (diff >= 0 && diff % r.interval_minutes === 0) {
+        const key = `${today}-${r.id}-${curTime}`;
+        if (!notifiedKeys.has(key)) {
+          notifiedKeys.add(key);
+          new Notification(emoji(r.type) + ' ' + r.title, { body: r.message, icon: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"%3E%3Ctext y=".9em" font-size="90"%3E🔔%3C/text%3E%3C/svg%3E', tag: key });
+        }
+      }
+      return;
+    }
+
+    // point reminders — fire at exact time
+    const key = `${today}-${r.id}-${t5}`;
+    if (!notifiedKeys.has(key) && curTime === t5) {
+      notifiedKeys.add(key);
+      new Notification(emoji(r.type) + ' ' + r.title, { body: r.message, icon: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"%3E%3Ctext y=".9em" font-size="90"%3E🔔%3C/text%3E%3C/svg%3E', tag: key });
+    }
+  });
+}
+
+let _notifInterval = null;
+function startNotificationLoop() {
+  requestNotifPermission();
+  if (_notifInterval) clearInterval(_notifInterval);
+  _notifInterval = setInterval(checkAndFireNotifications, 30000); // every 30s
+  checkAndFireNotifications(); // immediate first check
+}
+
 // ─── On load, check for existing session ───
 (async function init() {
+  // Register service worker for PWA
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/health-reminder/sw.js').catch(() => {});
+  }
   const { data: { session } } = await supabase.auth.getSession();
   if (session?.user) {
     user = session.user;
@@ -910,5 +996,6 @@ const TEAS = [
     document.getElementById('app').style.display = 'flex';
     await loadAll();
     goTab('dashboard');
+    startNotificationLoop();
   }
 })();
