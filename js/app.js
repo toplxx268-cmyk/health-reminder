@@ -195,11 +195,11 @@ function renderDash() {
       const s = (r.time||'09:00').slice(0,5);
       const e = (r.active_hours_end||'12:00').slice(0,5);
       const isDone = doneIds.has(r.id);
-      html += `<div class="tblock"><div class="ind"></div><div style="flex:1"><div${isDone?' style="text-decoration:line-through;color:var(--s)"':''}>📝 ${r.title}</div><div style="font-size:12px;color:var(--s)">${s} – ${e}</div></div>`
+      html += `<div class="tblock" onclick="openEdit('${r.id}')" style="cursor:pointer"><div class="ind"></div><div style="flex:1"><div${isDone?' style="text-decoration:line-through;color:var(--s)"':''}>📝 ${r.title}</div><div style="font-size:12px;color:var(--s)">${s} – ${e}</div></div>`
         +`<div style="flex-shrink:0">`
         +(isDone
-          ?`<button style="font-size:20px;color:var(--g);background:none;border:none;cursor:pointer;padding:4px" onclick="toggleComplete('${r.id}',true)">✓</button>`
-          :`<button class="dbtn" onclick="toggleComplete('${r.id}',false)">完成</button>`)
+          ?`<button style="font-size:20px;color:var(--g);background:none;border:none;cursor:pointer;padding:4px" onclick="event.stopPropagation();toggleComplete('${r.id}',true)">✓</button>`
+          :`<button class="dbtn" onclick="event.stopPropagation();toggleComplete('${r.id}',false)">完成</button>`)
         +`</div></div>`;
     });
   }
@@ -218,17 +218,17 @@ function renderDash() {
     if (r.active_hours_start) tags += `<span>${r.active_hours_start.slice(0,5)}–${r.active_hours_end?.slice(0,5)}</span>`;
     if (baseType(r.type)==='tea') tags += `<span>🍵 ${teaName(r.selected_tea_key)}</span>`;
 
-    html += `<div class="row"><div class="tc" style="color:${isPast?'var(--s)':'var(--t)'}">${r.time.slice(0,5)}</div>`
+    html += `<div class="row" onclick="openEdit('${r.id}')" style="cursor:pointer"><div class="tc" style="color:${isPast?'var(--s)':'var(--t)'}">${r.time.slice(0,5)}</div>`
       +`<div class="lc"><div class="dot ${dotCls}"></div>${i<points.length-1?'<div class="line"></div>':''}</div>`
       +`<div class="rc"><div class="info">`
       +`<div class="tt ${isDone?'done':''}">${emoji(r.type)} ${r.title}</div>`
-      +(baseType(r.type)==='exercise' && r.video_link ? `<a class="vlink" href="${r.video_link}" target="_blank">▶ 观看跟练视频</a>`:'')
+      +(baseType(r.type)==='exercise' && r.video_link ? `<a class="vlink" href="${r.video_link}" target="_blank" onclick="event.stopPropagation()">▶ 观看跟练视频</a>`:'')
       +`<div class="msg">${r.message||''}</div>`
       +(tags?`<div class="tags">${tags}</div>`:'')
       +`</div><div style="flex-shrink:0">`
       +(isDone
-        ?`<button style="font-size:20px;color:var(--g);background:none;border:none;cursor:pointer;padding:4px" onclick="toggleComplete('${r.id}',true)">✓</button>`
-        :`<button class="dbtn" onclick="toggleComplete('${r.id}',false)">完成</button>`)
+        ?`<button style="font-size:20px;color:var(--g);background:none;border:none;cursor:pointer;padding:4px" onclick="event.stopPropagation();toggleComplete('${r.id}',true)">✓</button>`
+        :`<button class="dbtn" onclick="event.stopPropagation();toggleComplete('${r.id}',false)">完成</button>`)
       +`</div></div></div>`;
   });
 
@@ -376,6 +376,9 @@ function renderEditForm() {
       if (t) h += `<div class="card" style="margin-top:8px"><div style="font-size:13px;font-weight:600">${t.name} · ${t.englishName}</div><div style="font-size:12px;color:var(--s)">性${t.nature} · 味${t.taste} · 归经${t.meridians}</div><div style="display:flex;flex-wrap:wrap;gap:4px;margin:4px 0">${t.effects.map(e=>`<span style="font-size:11px;background:rgba(52,199,89,.1);padding:2px 6px;border-radius:4px">${e}</span>`).join('')}</div><div style="font-size:12px;color:var(--s)">${t.description}</div><div style="font-size:12px;color:var(--g)">✅ ${t.suitableFor}</div><div style="font-size:12px;color:var(--o)">⚠️ ${t.caution}</div></div>`;
     }
   }
+
+  // delete button at the bottom of edit form
+  h += `<button onclick="event.stopPropagation();closeMod('mod-edit');deleteReminder('${r.id}')" style="display:block;width:100%;padding:14px;margin-top:12px;background:none;border:1.5px solid var(--r);border-radius:10px;color:var(--r);font-size:16px;cursor:pointer">🗑️ 删除此提醒</button>`;
 
   document.getElementById('edit-body').innerHTML = h;
 }
