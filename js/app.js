@@ -187,7 +187,7 @@ function renderDash() {
 
   // task blocks
   if (blocks.length > 0) {
-    html += `<div class="st">📅 任务块</div>`;
+    html += `<div class="st">📅 任务</div>`;
     blocks.forEach(r => {
       const s = (r.time||'09:00').slice(0,5);
       const e = (r.active_hours_end||'12:00').slice(0,5);
@@ -589,7 +589,7 @@ function showNewBlock() {
     interval_minutes: null, video_link: null, selected_tea_key: null,
   };
   document.getElementById('newblock-body').innerHTML = `
-    <div class="frm"><label>任务块名称</label><input type="text" placeholder="例如：写论文、午休" onchange="newBlock.title=this.value"></div>
+    <div class="frm"><label>任务名称</label><input type="text" placeholder="例如：写论文、午休" onchange="newBlock.title=this.value"></div>
     <div class="frm"><label>开始时间</label><input type="time" value="09:00" onchange="newBlock.time=this.value+':00';newBlock.active_hours_start=this.value+':00'"></div>
     <div class="frm"><label>结束时间</label><input type="time" value="12:00" onchange="newBlock.active_hours_end=this.value+':00'"></div>
     <div class="frm"><label>提醒内容</label><textarea onchange="newBlock.message=this.value" rows="2" placeholder="显示在仪表盘上"></textarea></div>
@@ -598,7 +598,7 @@ function showNewBlock() {
 }
 
 async function saveNewBlock() {
-  if (!newBlock.title.trim()) { alert('请输入时间块名称'); return; }
+  if (!newBlock.title.trim()) { alert('请输入任务名称'); return; }
   const r = newBlock;
   const { data, error } = await supabase.from('reminders').insert({
     user_id: user.id, type: 'writing', title: r.title.trim(),
