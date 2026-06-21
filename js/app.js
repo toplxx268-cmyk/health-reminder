@@ -409,10 +409,11 @@ async function saveEdit() {
 // ─── Diet ───
 function renderDiet() {
   const covered = new Set(meals.flatMap(e => e.food_groups || []));
-  const daily = ['vegetables','fruits','wholeGrains','legumes','nuts','oliveOil','herbs'];
-  const weekly = ['fish','poultry','eggs','dairy'];
-  const limited = ['redMeat','sweets'];
+  const daily = FG_DAILY;
+  const weekly = FG_WEEKLY;
+  const limited = FG_LIMIT;
   const cc = daily.filter(t => covered.has(t)).length;
+  const vegCount = FG_VEG.filter(k => covered.has(k)).length;
   const pct = cc / daily.length;
   const ringP = 2*Math.PI*15.5;
 
@@ -422,7 +423,7 @@ function renderDiet() {
   h += `<div class="card flex"><button class="btn" onclick="shiftDiet(-1)">‹</button><span style="font-weight:600">${fmtDate(dietDate)}</span><button class="btn" onclick="shiftDiet(1)">›</button><button style="font-size:13px;color:var(--g);background:none;border:none;cursor:pointer;padding:4px 8px" onclick="dietDate=new Date();loadMeals().then(renderDiet)">今天</button></div>`;
 
   // progress
-  h += `<div class="card" style="display:flex;align-items:center;gap:16px"><div class="ring" style="width:64px;height:64px"><svg viewBox="0 0 36 36" width="64" height="64"><circle class="ring-bg" cx="18" cy="18" r="15.5"/><circle class="ring-fg" cx="18" cy="18" r="15.5" stroke-dasharray="${ringP}" stroke-dashoffset="${ringP*(1-pct)}"/></svg><div class="ring-t" style="font-size:14px">${Math.round(pct*100)}%</div></div><div style="flex:1"><div style="font-weight:600">每日核心食物</div><div style="font-size:13px;color:var(--s)">已覆盖 ${cc}/${daily.length} 类</div></div></div>`;
+  h += `<div class="card" style="display:flex;align-items:center;gap:16px"><div class="ring" style="width:64px;height:64px"><svg viewBox="0 0 36 36" width="64" height="64"><circle class="ring-bg" cx="18" cy="18" r="15.5"/><circle class="ring-fg" cx="18" cy="18" r="15.5" stroke-dasharray="${ringP}" stroke-dashoffset="${ringP*(1-pct)}"/></svg><div class="ring-t" style="font-size:14px">${Math.round(pct*100)}%</div></div><div style="flex:1"><div style="font-weight:600">每日核心食物</div><div style="font-size:13px;color:var(--s)">已覆盖 ${cc}/${daily.length} 类 · 蔬菜 ${vegCount}/5 种</div></div></div>`;
 
   // daily checklist
   h += `<div class="st">🥇 每日核心食物</div><div class="grid2">${daily.map(k=>{
@@ -431,10 +432,10 @@ function renderDiet() {
     return `<div class="chk"><span style="color:${ok?'var(--g)':'#C7C7CC'}">${ok?'✅':'⭕'}</span><div><div class="nm">${info.em} ${info.nm}</div><div class="fq">${info.fq}</div></div></div>`;
   }).join('')}</div>`;
 
-  // weekly
+  // weekly with frequency subtitle
   h += `<div class="st">📆 适量摄入</div><div class="fbar">${weekly.map(k=>{
     const info = FG[k]; const ok = covered.has(k);
-    return `<div class="fitem"><div style="font-size:22px;opacity:${ok?1:.4}">${info.em}</div><div class="nm" style="color:${ok?'var(--t)':'var(--s)'}">${info.nm}</div></div>`;
+    return `<div class="fitem"><div style="font-size:22px;opacity:${ok?1:.4}">${info.em}</div><div class="nm" style="color:${ok?'var(--t)':'var(--s)'}">${info.nm}</div><div style="font-size:10px;color:var(--s);margin-top:1px">${info.fq}</div></div>`;
   }).join('')}</div>`;
 
   // limited warning
@@ -505,14 +506,14 @@ function showLogMeal() {
 }
 
 function renderLogForm() {
-  const daily = ['vegetables','fruits','wholeGrains','legumes','nuts','oliveOil','herbs'];
-  const weekly = ['fish','poultry','eggs','dairy'];
-  const limited = ['redMeat','sweets'];
+  const daily = FG_DAILY;
+  const weekly = FG_WEEKLY;
+  const limited = FG_LIMIT;
 
   function fgBtns(grps,label) {
     return `<div style="font-size:13px;font-weight:600;color:var(--s);margin:12px 0 4px">${label}</div><div class="fgrid">${grps.map(k=>{
       const info = FG[k]; const sel = logGroups.has(k);
-      return `<button class="fbtn ${sel?'sel':''}" onclick="togFG('${k}')">${info.em} ${info.nm}</button>`;
+      return `<button class="fbtn ${sel?'sel':''}" onclick="togFG('${k}')">${info.em} ${info.nm}<br><span style="font-size:10px;opacity:.7">${info.fq}</span></button>`;
     }).join('')}</div>`;
   }
 
@@ -561,9 +562,9 @@ function showTeaGuide() {
 }
 
 function showMedGuide() {
-  const daily = ['vegetables','fruits','wholeGrains','legumes','nuts','oliveOil','herbs'];
-  const weekly = ['fish','poultry','eggs','dairy'];
-  const limited = ['redMeat','sweets'];
+  const daily = FG_DAILY;
+  const weekly = FG_WEEKLY;
+  const limited = FG_LIMIT;
 
   function cards(grps) {
     return grps.map(k => {
@@ -753,7 +754,7 @@ function renderStatContent() {
   mealsData.forEach(m => {
     if (!dailyDietCoverage[m.date]) dailyDietCoverage[m.date] = new Set();
     (m.food_groups || []).forEach(g => {
-      if (['vegetables','fruits','wholeGrains','legumes','nuts','oliveOil','herbs'].includes(g)) {
+      if (FG_DAILY.includes(g)) {
         dailyDietCoverage[m.date].add(g);
       }
     });
@@ -795,11 +796,12 @@ function renderStatContent() {
   html += '</div></div>';
 
   // ─── Diet Trend ───
-  html += '<div class="card"><div style="font-weight:600;margin-bottom:8px">🥗 饮食覆盖率趋势（每日核心7类）</div>';
+  const dietTotal = FG_DAILY.length;
+  html += `<div class="card"><div style="font-weight:600;margin-bottom:8px">🥗 饮食覆盖率趋势（每日核心${dietTotal}类）</div>`;
   html += '<div style="display:flex;gap:1px;align-items:flex-end;overflow-x:auto;padding-bottom:4px">';
   days.forEach(d => {
     const c = (dailyDietCoverage[d.date] || new Set()).size;
-    const pct = c / 7;
+    const pct = c / dietTotal;
     const h = Math.max(4, pct*60);
     const today = d.date === ts();
     const w = statMode==='month'?'16':'28';
@@ -817,7 +819,7 @@ function renderStatContent() {
   const daysWithMeals = new Set(mealsData.map(m=>m.date)).size;
   const totalCompletions = comps.length;
   const avgDailyComp = totalDays > 0 ? (totalCompletions / totalDays).toFixed(1) : '0.0';
-  const dietPcts = days.map(d => (dailyDietCoverage[d.date]||new Set()).size/7);
+  const dietPcts = days.map(d => (dailyDietCoverage[d.date]||new Set()).size/dietTotal);
   const avgDietPct = dietPcts.length > 0 ? (dietPcts.reduce((a,b)=>a+b,0)/dietPcts.length*100).toFixed(0) : 0;
 
   html += `<div class="card">
@@ -879,20 +881,32 @@ document.addEventListener('click', function(e) {
 
 // ─── Data: Food Groups ───
 const FG = {
-  vegetables:{em:'🥦',nm:'蔬菜',fq:'每日3+份',ds:'地中海饮食基础，富含维生素和抗氧化剂，每餐占餐盘一半。',ex:['菠菜','西兰花','番茄','彩椒','茄子','黄瓜']},
-  fruits:{em:'🍎',nm:'水果',fq:'每日2+份',ds:'餐后甜点最佳选择，富含纤维和维生素C。新鲜水果优于果汁。',ex:['苹果','橙子','葡萄','石榴','无花果','莓果']},
-  wholeGrains:{em:'🌾',nm:'全谷物',fq:'每日3-6份',ds:'提供持久能量和膳食纤维，选择未经精制的全谷物。',ex:['藜麦','燕麦','糙米','全麦面包','意面']},
-  legumes:{em:'🫘',nm:'豆类',fq:'每日1+份',ds:'优质植物蛋白和膳食纤维来源，经济实惠。',ex:['鹰嘴豆','扁豆','蚕豆','白豆','小扁豆']},
-  nuts:{em:'🥜',nm:'坚果种子',fq:'每日1份',ds:'富含健康脂肪和微量元素，每天一小把。',ex:['杏仁','核桃','腰果','松子','芝麻']},
-  oliveOil:{em:'🫒',nm:'橄榄油',fq:'主要脂肪来源',ds:'地中海饮食核心脂肪，富含单不饱和脂肪酸。特级初榨最佳。',ex:['特级初榨橄榄油']},
-  herbs:{em:'🌿',nm:'香草香料',fq:'替代盐调味',ds:'用香草香料替代盐，减少钠摄入。',ex:['迷迭香','百里香','牛至','罗勒','蒜']},
-  fish:{em:'🐟',nm:'鱼虾海鲜',fq:'每周2+次',ds:'富含Omega-3，有助心血管健康。深海鱼尤佳。',ex:['三文鱼','沙丁鱼','鳕鱼','虾','贝类']},
-  poultry:{em:'🐔',nm:'禽肉',fq:'每周2-3次',ds:'优质蛋白来源，白肉优于红肉，烤蒸为宜。',ex:['鸡肉','鸭肉','火鸡肉']},
-  eggs:{em:'🥚',nm:'鸡蛋',fq:'每周2-4个',ds:'优质蛋白质和多种维生素来源。',ex:['鸡蛋','鹌鹑蛋']},
-  dairy:{em:'🧀',nm:'乳制品',fq:'每日1-2份',ds:'建议发酵乳制品如希腊酸奶和奶酪。',ex:['希腊酸奶','羊奶酪','帕玛森芝士']},
-  redMeat:{em:'🥩',nm:'红肉',fq:'每周<2次',ds:'限制摄入量，每月几次而非每日。',ex:['牛肉','猪肉','羊肉']},
-  sweets:{em:'🍰',nm:'甜食',fq:'尽量少食',ds:'减少摄入，想吃甜食选新鲜水果。',ex:['蛋糕','糖果','含糖饮料']},
+  // 蔬菜细分（每日必须，每餐占餐盘一半）
+  vegLeafy:     {em:'🥬', nm:'叶菜类', cat:'veg', fq:'每日', ds:'深色绿叶菜富含叶酸、铁、钙，每餐必备。', ex:['菠菜','生菜','油菜','茼蒿','小白菜','芝麻菜']},
+  vegCruciferous:{em:'🥦', nm:'十字花科', cat:'veg', fq:'每日', ds:'含硫代葡萄糖苷有助抗癌。清蒸或快炒最佳。', ex:['西兰花','花椰菜','卷心菜','羽衣甘蓝','芥蓝','抱子甘蓝']},
+  vegFruit:     {em:'🍅', nm:'果菜类', cat:'veg', fq:'每日', ds:'番茄富含番茄红素，烹饪后更易吸收。', ex:['番茄','彩椒','茄子','黄瓜','西葫芦','秋葵']},
+  vegRoot:      {em:'🥕', nm:'根茎类', cat:'veg', fq:'每日', ds:'富含β-胡萝卜素和膳食纤维。', ex:['胡萝卜','白萝卜','甜菜','红薯','山药','莲藕']},
+  vegAllium:    {em:'🧅', nm:'葱蒜类', cat:'veg', fq:'每日', ds:'含大蒜素有助抗炎、增强免疫。', ex:['洋葱','大蒜','韭菜','葱','蒜苗','红葱头']},
+  // 每日必须
+  fruits:       {em:'🍎', nm:'水果', cat:'daily', fq:'每日≥2份', ds:'餐后甜点最佳选择。新鲜水果优于果汁。', ex:['苹果','橙子','葡萄','石榴','无花果','莓果','梨']},
+  wholeGrains:  {em:'🌾', nm:'全谷物', cat:'daily', fq:'每日3-6份', ds:'提供持久能量和膳食纤维。', ex:['藜麦','燕麦','糙米','全麦面包','意面','荞麦']},
+  legumes:      {em:'🫘', nm:'豆类', cat:'daily', fq:'每日≥1份', ds:'优质植物蛋白，经济实惠。', ex:['鹰嘴豆','扁豆','蚕豆','白豆','小扁豆','毛豆']},
+  nuts:         {em:'🥜', nm:'坚果种子', cat:'daily', fq:'每日1小把', ds:'富含健康脂肪和微量元素。', ex:['杏仁','核桃','腰果','松子','芝麻','亚麻籽']},
+  oliveOil:     {em:'🫒', nm:'橄榄油', cat:'daily', fq:'主要脂肪', ds:'地中海饮食核心，特级初榨最佳。', ex:['特级初榨橄榄油']},
+  herbs:        {em:'🌿', nm:'香草香料', cat:'daily', fq:'替代盐', ds:'减少钠摄入，增添风味。', ex:['迷迭香','百里香','牛至','罗勒','大蒜','欧芹']},
+  // 每周适量
+  fish:         {em:'🐟', nm:'鱼虾海鲜', cat:'weekly', fq:'每周≥2次', ds:'富含Omega-3，深海鱼尤佳。', ex:['三文鱼','沙丁鱼','鳕鱼','虾','贻贝','鲭鱼']},
+  poultry:      {em:'🐔', nm:'禽肉', cat:'weekly', fq:'每周2-3次', ds:'白肉优于红肉，去皮烤蒸。', ex:['鸡胸肉','鸭肉','火鸡肉','鹌鹑']},
+  eggs:         {em:'🥚', nm:'鸡蛋', cat:'weekly', fq:'每周2-4个', ds:'优质蛋白，煮蛋或水波蛋最佳。', ex:['鸡蛋','鹌鹑蛋','鸭蛋']},
+  dairy:        {em:'🧀', nm:'乳制品', cat:'weekly', fq:'每日1-2份', ds:'优选发酵乳制品。', ex:['希腊酸奶','羊奶酪','帕玛森','开菲尔']},
+  // 限制
+  redMeat:      {em:'🥩', nm:'红肉', cat:'limited', fq:'每周≤1次', ds:'严格限制，每月几次而非每日。', ex:['牛肉','猪肉','羊肉','加工肉']},
+  sweets:       {em:'🍰', nm:'甜食', cat:'limited', fq:'尽量不吃', ds:'想吃甜食选新鲜水果替代。', ex:['蛋糕','糖果','含糖饮料','冰淇淋']},
 };
+const FG_DAILY  = Object.keys(FG).filter(k => FG[k].cat === 'veg' || FG[k].cat === 'daily');  // 11 items
+const FG_WEEKLY = Object.keys(FG).filter(k => FG[k].cat === 'weekly'); // 4 items
+const FG_LIMIT  = Object.keys(FG).filter(k => FG[k].cat === 'limited'); // 2 items
+const FG_VEG    = Object.keys(FG).filter(k => FG[k].cat === 'veg');     // 5 vegetable sub-types
 
 const MT = {
   breakfast:{em:'🌅',nm:'早餐'}, lunch:{em:'☀️',nm:'午餐'},
