@@ -9,7 +9,7 @@ create table reminders (
   user_id uuid references auth.users not null default auth.uid(),
   type text not null check (type in (
     'wakeUp','medication','exercise','tea','diet',
-    'eyeCare','sedentary','writing','bedtime'
+    'eyeCare','sedentary','writing','bedtime','custom'
   )),
   title text not null,
   is_enabled boolean default true,
