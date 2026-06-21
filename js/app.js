@@ -287,16 +287,8 @@ function _isInterval(r) { return r.interval_minutes && r.interval_minutes > 0; }
 
 // ─── Settings ───
 function renderSett() {
-  const point = [], inter = [], blk = [];
-  reminders.forEach(r => {
-    if (_isBlock(r)) blk.push(r);
-    else if (r.interval_minutes && r.interval_minutes > 0) inter.push(r);
-    else point.push(r);
-  });
-
-  renderSettGroup('sett-point', point);
-  renderSettGroup('sett-interval', inter);
-  renderSettGroup('sett-block', blk);
+  // Settings now only contains reference guides (static HTML)
+  // All edit/delete/new operations are on the dashboard
 }
 
 function renderSettGroup(elId, items) {
