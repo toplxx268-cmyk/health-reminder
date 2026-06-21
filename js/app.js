@@ -22,9 +22,13 @@ let allMeals = [];
 // ─── Helpers ───
 function ts(d) { const dt = d || new Date(); return dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0'); }
 
+function baseType(t) {
+  // strip trailing _<digits> suffix for type lookup
+  return (t||'').replace(/_\d+$/, '');
+}
 function emoji(t) {
   const m = { wakeUp:'☀️', medication:'💊', exercise:'🏃', tea:'🍵', diet:'🥗', eyeCare:'👀', sedentary:'🚶', writing:'📝', bedtime:'😴' };
-  return m[t]||'⏰';
+  return m[baseType(t)]||'⏰';
 }
 
 function teaName(k) {
@@ -211,13 +215,13 @@ function renderDash() {
     let tags = '';
     if (r.interval_minutes) tags += `<span>每${r.interval_minutes}分钟</span>`;
     if (r.active_hours_start) tags += `<span>${r.active_hours_start.slice(0,5)}–${r.active_hours_end?.slice(0,5)}</span>`;
-    if (r.type==='tea') tags += `<span>🍵 ${teaName(r.selected_tea_key)}</span>`;
+    if (baseType(r.type)==='tea') tags += `<span>🍵 ${teaName(r.selected_tea_key)}</span>`;
 
     html += `<div class="row"><div class="tc" style="color:${isPast?'var(--s)':'var(--t)'}">${r.time.slice(0,5)}</div>`
       +`<div class="lc"><div class="dot ${dotCls}"></div>${i<points.length-1?'<div class="line"></div>':''}</div>`
       +`<div class="rc"><div class="info">`
       +`<div class="tt ${isDone?'done':''}">${emoji(r.type)} ${r.title}</div>`
-      +(r.type==='exercise' && r.video_link ? `<a class="vlink" href="${r.video_link}" target="_blank">▶ 观看跟练视频</a>`:'')
+      +(baseType(r.type)==='exercise' && r.video_link ? `<a class="vlink" href="${r.video_link}" target="_blank">▶ 观看跟练视频</a>`:'')
       +`<div class="msg">${r.message||''}</div>`
       +(tags?`<div class="tags">${tags}</div>`:'')
       +`</div><div style="flex-shrink:0">`
@@ -277,7 +281,7 @@ function exportCalendar() {
   alert('.ics 文件已下载！\\n\\n打开文件 → 自动导入 Apple 日历\\n\\n💡 提示：网页版无法直接同步日历，\\n每次修改提醒后需要重新导出。\\n建议添加到主屏幕后每天导出一次。');
 }
 
-function _isBlock(r) { return r.type==='writing' || (r.active_hours_end && !r.interval_minutes); }
+function _isBlock(r) { return baseType(r.type)==='writing' || (r.active_hours_end && !r.interval_minutes); }
 function _isInterval(r) { return r.interval_minutes && r.interval_minutes > 0; }
 
 // ─── Settings ───
@@ -348,10 +352,10 @@ function renderEditForm() {
     </select><div class="hint">设置后在活跃时段内每隔所选时间重复提醒</div></div>`
     +`<div class="frm"><label>提醒内容</label><textarea onchange="editing.message=this.value" rows="2">${r.message||''}</textarea></div>`;
 
-  if (r.type==='exercise') {
+  if (baseType(r.type)==='exercise') {
     h += `<div class="frm"><label>🏃 跟练视频链接</label><input type="url" placeholder="YouTube / Bilibili 链接" value="${r.video_link||''}" onchange="editing.video_link=this.value"><div class="hint">保存后仪表盘可一键打开视频</div></div>`;
   }
-  if (r.type==='tea') {
+  if (baseType(r.type)==='tea') {
     h += `<div class="frm"><label>🍵 茶种</label><select onchange="editing.selected_tea_key=this.value">${TEAS.map(t=>`<option value="${t.key}" ${r.selected_tea_key===t.key?'selected':''}>${t.name}（${t.nature}）</option>`).join('')}</select></div>`;
     if (r.selected_tea_key) {
       const t = TEAS.find(x => x.key===r.selected_tea_key);
@@ -613,8 +617,8 @@ function showNewReminder() {
 async function saveNewReminder() {
   if (!newReminder.title.trim()) { alert('请输入提醒名称'); return; }
   const r = newReminder;
-  // 自定义类型加时间戳后缀，避免唯一索引冲突
-  const finalType = r.type === 'custom' ? 'custom_' + Date.now() : r.type;
+  // 所有新增提醒加时间戳后缀，避免唯一索引冲突
+  const finalType = r.type + '_' + Date.now();
   const { data, error } = await supabase.from('reminders').insert({
     user_id: user.id, type: finalType, title: r.title.trim(),
     is_enabled: true, time: r.time, message: r.message || r.title,
