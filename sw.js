@@ -1,6 +1,6 @@
 // 健康提醒 — Service Worker (offline cache + PWA)
 
-const CACHE = 'health-reminder-v3';
+const CACHE = 'health-reminder-v4';
 const URLS = [
   '/health-reminder/',
   '/health-reminder/index.html',
@@ -29,9 +29,15 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
+  // network-first: always try network, fall back to cache
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      return cached || fetch(event.request).catch(() => cached);
+    fetch(event.request).then(response => {
+      // update cache with fresh response
+      const clone = response.clone();
+      caches.open(CACHE).then(cache => cache.put(event.request, clone));
+      return response;
+    }).catch(() => {
+      return caches.match(event.request);
     })
   );
 });
