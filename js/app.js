@@ -1115,14 +1115,6 @@ function renderDiet() {
     h += `<div class="card" style="border-left:4px solid var(--o)"><div style="color:var(--o);font-weight:600;font-size:13px">⚠️ 限食</div><div style="margin-top:4px">${lim.map(k=>FG[k].em+' '+FG[k].nm).join(' ')}</div></div>`;
   }
 
-  // cross-diet summary — show coverage across all three diets
-  h += '<div class="card" style="margin-top:10px"><div style="font-weight:600;font-size:13px;margin-bottom:6px">📊 三类饮食结构覆盖</div>';
-  Object.entries(DIETS).forEach(([k,v]) => {
-    const cov = v.daily.filter(t => covered.has(t)).length;
-    h += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px"><span style="font-size:14px;width:22px">'+v.em+'</span><span style="font-size:11px;width:50px;color:var(--s)">'+v.name+'</span><div class="bar" style="flex:1;height:12px"><div class="bar-f" style="width:'+(cov/v.daily.length*100)+'%;background:'+(k===dietMode?'var(--g)':'#C7C7CC')+';border-radius:2px"></div></div><span style="font-size:11px;font-weight:600;width:28px;color:'+(k===dietMode?'var(--g)':'var(--s)')+'">'+cov+'/'+v.daily.length+'</span></div>';
-  });
-  h += '</div>';
-
   // meal entries
   h += `<div class="st">📋 餐食记录</div>`;
   if (meals.length === 0) {
@@ -1635,26 +1627,26 @@ const FG_VEG    = Object.keys(FG).filter(k => FG[k].cat === 'veg');     // 5 veg
 
 // Diet frameworks — each maps FG keys to diet-specific categories
 const DIETS = {
+  modern: {
+    name:'现代健康饮食', em:'💪', desc:'均衡7大类，灵活搭配',
+    daily: ['vegLeafy','vegCruciferous','vegFruit','vegRoot','vegAllium','fruits','wholeGrains'],
+    weekly: ['legumes','nuts','oliveOil','fish','poultry','eggs','dairy'],
+    limited: ['redMeat','sweets'],
+  },
   med: {
     name:'地中海饮食', em:'🫒', desc:'US News #1 最佳饮食',
-    daily: FG_DAILY,  // 11 core items
+    daily: FG_DAILY,
     weekly: FG_WEEKLY,
     limited: FG_LIMIT,
   },
   mind: {
-    name:'MIND饮食', em:'🧠', desc:'延缓神经退行，护脑饮食',
-    daily: ['vegLeafy','vegCruciferous','vegFruit','vegRoot','vegAllium','fruits','wholeGrains','legumes','nuts','oliveOil'],
-    weekly: ['fish','poultry','eggs'],
+    name:'MIND饮食', em:'🧠', desc:'15类健脑食物，延缓认知退化',
+    daily: ['vegLeafy','vegCruciferous','vegFruit','vegRoot','vegAllium','fruits','wholeGrains'],
+    weekly: ['legumes','nuts','oliveOil','fish','poultry'],
     limited: ['redMeat','sweets','dairy'],
   },
-  modern: {
-    name:'现代健康饮食', em:'💪', desc:'均衡营养，灵活搭配',
-    daily: ['vegLeafy','vegCruciferous','vegFruit','vegRoot','vegAllium','fruits','wholeGrains','legumes','nuts','oliveOil','herbs'],
-    weekly: ['fish','poultry','eggs','dairy'],
-    limited: ['redMeat','sweets'],
-  },
 };
-let dietMode = 'med'; // 'med' | 'mind' | 'modern'
+let dietMode = 'modern'; // 'modern' | 'med' | 'mind'
 
 // ─── AI Food Classifier: keyword → FG key ───
 const FOOD_KW = {
