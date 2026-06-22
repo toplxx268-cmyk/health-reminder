@@ -180,6 +180,9 @@
       <div style="font-size:13px;opacity:.8;margin-top:2px;word-break:break-all" id="drawer-email"></div>
     </div>
     <div style="flex:1;padding:12px 0">
+      <button onclick="showTeaGuide();closeDrawer()" style="width:100%;text-align:left;padding:14px 20px;background:none;border:none;font-size:15px;cursor:pointer;display:flex;align-items:center;gap:10px">🍵 18种茶饮详情</button>
+      <button onclick="showMedGuide();closeDrawer()" style="width:100%;text-align:left;padding:14px 20px;background:none;border:none;font-size:15px;cursor:pointer;display:flex;align-items:center;gap:10px">🥗 地中海饮食指南</button>
+      <div style="height:1px;background:var(--sep);margin:8px 16px"></div>
       <button onclick="location.reload()" style="width:100%;text-align:left;padding:14px 20px;background:none;border:none;font-size:16px;cursor:pointer;display:flex;align-items:center;gap:10px">🔄 刷新网页</button>
       <button onclick="doSignOut();closeDrawer()" style="width:100%;text-align:left;padding:14px 20px;background:none;border:none;font-size:16px;cursor:pointer;display:flex;align-items:center;gap:10px;color:var(--r)">🚪 退出登录</button>
     </div>
@@ -199,21 +202,20 @@
   <div id="pane-settings" class="pane">
     <div id="tcm-recommendations"></div>
 
-    <div id="tcm-symptom-tags" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px"></div>
+    <div id="tcm-symptom-tags" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px"></div>
+    <div id="tcm-ai-bar" style="margin-bottom:10px"></div>
 
-    <div id="tcm-guide-btns" style="margin-top:20px">
-      <button class="fab" style="background:var(--card);color:var(--t);box-shadow:0 1px 3px rgba(0,0,0,.04);margin-bottom:8px" onclick="showTeaGuide()">🍵 18种茶饮详情</button>
-      <button class="fab" style="background:var(--card);color:var(--t);box-shadow:0 1px 3px rgba(0,0,0,.04);margin-bottom:8px" onclick="showMedGuide()">🥗 地中海饮食指南</button>
-    </div>
   </div>
 
   <!-- ===== STATS ===== -->
   <div id="pane-stats" class="pane">
     <div class="st">📊 健康统计</div>
-    <div style="display:flex;gap:8px;margin-bottom:16px">
-      <button style="flex:1;padding:10px;border-radius:10px;border:1.5px solid var(--sep);background:#F9F9F9;cursor:pointer;font-size:14px" id="stat-week-btn" onclick="switchStat('week')">本周汇总</button>
-      <button style="flex:1;padding:10px;border-radius:10px;border:1.5px solid var(--sep);background:#F9F9F9;cursor:pointer;font-size:14px" id="stat-month-btn" onclick="switchStat('month')">本月汇总</button>
+    <div style="display:flex;gap:6px;margin-bottom:12px">
+      <button style="flex:1;padding:8px;border-radius:8px;border:1.5px solid var(--sep);background:#F9F9F9;cursor:pointer;font-size:13px" id="stat-week-btn" onclick="switchStat('week')">周</button>
+      <button style="flex:1;padding:8px;border-radius:8px;border:1.5px solid var(--sep);background:#F9F9F9;cursor:pointer;font-size:13px" id="stat-month-btn" onclick="switchStat('month')">月</button>
+      <button style="flex:1;padding:8px;border-radius:8px;border:1.5px solid var(--sep);background:#F9F9F9;cursor:pointer;font-size:13px" id="stat-year-btn" onclick="switchStat('year')">年</button>
     </div>
+    <div id="stats-calendar" style="margin-bottom:12px"></div>
     <div id="stats-content"></div>
   </div>
 

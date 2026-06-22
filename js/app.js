@@ -226,6 +226,10 @@ function renderDash() {
     if (r.interval_minutes) tags += `<span>每${r.interval_minutes}分钟</span>`;
     if (r.active_hours_start) tags += `<span>${r.active_hours_start.slice(0,5)}–${r.active_hours_end?.slice(0,5)}</span>`;
     if (baseType(r.type)==='tea') tags += `<span>🍵 ${teaName(r.selected_tea_key)}</span>`;
+    const rep = parseRepeat(r);
+    if (rep.mode==='daily') tags += '<span>🔁 每天</span>';
+    if (rep.mode==='weekly') tags += '<span>🔁 周'+(rep.days||[]).map(i=>['一','二','三','四','五','六','日'][i-1]).join('')+'</span>';
+    if (rep.mode==='monthly') tags += '<span>🔁 每月'+rep.day+'日</span>';
 
     html += `<div class="row" onclick="openEdit('${r.id}')" style="cursor:pointer"><div class="tc" style="color:${isPast?'var(--s)':'var(--t)'}">${r.time.slice(0,5)}</div>`
       +`<div class="lc"><div class="dot ${dotCls}"></div>${i<points.length-1?'<div class="line"></div>':''}</div>`
@@ -293,6 +297,22 @@ function exportCalendar() {
 
 function _isBlock(r) { return baseType(r.type)==='writing' || (r.active_hours_end && !r.interval_minutes); }
 function _isInterval(r) { return r.interval_minutes && r.interval_minutes > 0; }
+function parseRepeat(r) {
+  // parse repeat config from selected_tea_key field
+  const v = r.selected_tea_key || '';
+  if (!v.startsWith('rep:')) return {mode: ''};
+  const parts = v.slice(4).split(':');
+  if (parts[0] === 'daily') return {mode: 'daily'};
+  if (parts[0] === 'weekly') return {mode: 'weekly', days: (parts[1]||'').split(',').map(Number).filter(Boolean)};
+  if (parts[0] === 'monthly') return {mode: 'monthly', day: parseInt(parts[1])||1};
+  return {mode: ''};
+}
+function encodeRepeat(mode, days, day) {
+  if (mode === 'daily') return 'rep:daily';
+  if (mode === 'weekly') return 'rep:weekly:' + (days||[]).join(',');
+  if (mode === 'monthly') return 'rep:monthly:' + (day||1);
+  return null;
+}
 
 // ─── Settings ───
 // ─── TCM Wellness ───
@@ -320,10 +340,9 @@ function renderTCM() {
     '<button onclick="switchTCMTab(\'log\')" style="flex:1;padding:10px;border-radius:10px;border:none;font-size:14px;cursor:pointer;font-weight:600;background:'+(tcmTab==='log'?'var(--g)':'#E5E5EA')+';color:'+(tcmTab==='log'?'#fff':'var(--t)')+'">📝 养生记录</button>'+
     '</div>';
 
-  // hide symptom tags and guide buttons in log mode
+  // hide symptom tags and ai bar in log mode
   document.getElementById('tcm-symptom-tags').style.display = tcmTab==='log' ? 'none' : '';
-  const gb = document.getElementById('tcm-guide-btns');
-  if (gb) gb.style.display = tcmTab==='log' ? 'none' : '';
+  document.getElementById('tcm-ai-bar').style.display = tcmTab==='log' ? 'none' : '';
 
   if (tcmTab === 'log') {
     document.getElementById('tcm-recommendations').innerHTML = tabBar + renderTCMLogTab();
@@ -411,20 +430,22 @@ function renderTCM() {
     }
   });
 
-  // ── AI analysis panel (above cards) ──
+  // AI bar — always rendered right below symptom tags, before recommendations
   const hasCustom = Array.from(tcmSelected).some(id => id.startsWith('cust_'));
   const customNames = hasCustom ? Array.from(tcmSelected).filter(id => id.startsWith('cust_')).map(id => tcmCustomMap[id]).filter(Boolean) : [];
   const allCached = hasCustom && customNames.length > 0 && customNames.every(n => tcmAI[n] && tcmAI[n].analysis);
-
+  let aiBarHtml = '';
   if (hasCustom) {
     if (!allCached && tcmAIKey) {
-      html += '<div style="display:flex;gap:6px;margin-bottom:12px"><button onclick="callTCMAI()" id="tcm-ai-btn" style="flex:1;padding:12px;border-radius:12px;border:1.5px dashed var(--p);background:rgba(175,82,222,.04);color:var(--p);font-size:14px;font-weight:600;cursor:pointer"'+(tcmAILoading?' disabled':'')+'>'+(tcmAILoading?'⏳ AI分析中...':'🤖 AI 智能推荐')+'</button><button onclick="resetAIKey()" style="padding:12px 10px;border-radius:12px;border:1px solid var(--sep);background:#fff;color:var(--s);font-size:11px;cursor:pointer;white-space:nowrap" title="重置API配置">⚙️</button></div>';
+      aiBarHtml = '<div style="display:flex;gap:6px"><button onclick="callTCMAI()" id="tcm-ai-btn" style="flex:1;padding:10px;border-radius:12px;border:1.5px dashed var(--p);background:rgba(175,82,222,.04);color:var(--p);font-size:13px;font-weight:600;cursor:pointer"'+(tcmAILoading?' disabled':'')+'>'+(tcmAILoading?'⏳ AI分析中...':'🤖 AI 智能推荐')+'</button><button onclick="resetAIKey()" style="padding:10px;border-radius:12px;border:1px solid var(--sep);background:#fff;color:var(--s);font-size:11px;cursor:pointer;white-space:nowrap">⚙️</button></div>';
     } else if (!tcmAIKey) {
-      html += '<button onclick="showAIKeyPrompt()" style="display:block;width:100%;padding:12px;margin-bottom:12px;border-radius:12px;border:1.5px dashed var(--sep);background:#F9F9F9;color:var(--s);font-size:14px;cursor:pointer">🤖 AI 智能推荐 <span style="font-size:11px;opacity:.7">（需配置API Key）</span></button>';
+      aiBarHtml = '<button onclick="showAIKeyPrompt()" style="display:block;width:100%;padding:10px;border-radius:12px;border:1.5px dashed var(--sep);background:#F9F9F9;color:var(--s);font-size:13px;cursor:pointer">🤖 AI 智能推荐 <span style="font-size:10px;opacity:.7">（免费配置）</span></button>';
     } else if (allCached) {
-      html += '<button onclick="resetAIKey()" style="display:block;width:100%;padding:6px;margin-bottom:10px;border-radius:8px;border:none;background:none;color:var(--s);font-size:11px;cursor:pointer;opacity:.5">⚙️ 重置AI配置</button>';
+      aiBarHtml = '<button onclick="refreshAI()" style="display:block;width:100%;padding:6px;border-radius:8px;border:1px solid var(--sep);background:#fff;color:var(--s);font-size:11px;cursor:pointer">🔄 重新AI分析</button>';
     }
   }
+  document.getElementById('tcm-ai-bar').innerHTML = aiBarHtml;
+  document.getElementById('tcm-ai-bar').style.display = aiBarHtml ? '' : 'none';
 
   // show AI analysis for cached symptoms
   if (allCached) {
@@ -937,6 +958,9 @@ function openEdit(id) {
   const r = reminders.find(x => x.id===id);
   if (!r) return;
   editing = Object.assign({}, r);
+  const repInfo = parseRepeat(r);
+  editing._repeatMode = repInfo.mode || '';
+  editing._repDays = repInfo.days || [];
   renderEditForm();
   document.getElementById('mod-edit').style.display = 'flex';
 }
@@ -963,7 +987,26 @@ function renderEditForm() {
       <option value="60" ${r.interval_minutes===60?'selected':''}>60 分钟</option>
       <option value="90" ${r.interval_minutes===90?'selected':''}>90 分钟</option>
       <option value="120" ${r.interval_minutes===120?'selected':''}>120 分钟</option>
-    </select><div class="hint">设置后在活跃时段内每隔所选时间重复提醒</div></div>`
+    </select><div class="hint">设置后在活跃时段内每隔所选时间重复提醒</div></div>`;
+    // daily/weekly/monthly repeat (for non-task reminders)
+    if (!_isBlock(r)) {
+      const repInfo = parseRepeat(r);
+      h += `<div class="frm"><label>📅 跨天重复</label><select onchange="editing._repeatMode=this.value">
+        <option value="" ${!repInfo.mode?'selected':''}>不重复</option>
+        <option value="daily" ${repInfo.mode==='daily'?'selected':''}>每天</option>
+        <option value="weekly" ${repInfo.mode==='weekly'?'selected':''}>每周</option>
+        <option value="monthly" ${repInfo.mode==='monthly'?'selected':''}>每月</option>
+      </select>`;
+      if (repInfo.mode==='weekly') {
+        h += '<div style="display:flex;gap:4px;margin-top:6px;flex-wrap:wrap">';
+        ['一','二','三','四','五','六','日'].forEach((d,i) => {
+          const on = (repInfo.days||[]).includes(i+1);
+          h += `<button onclick="var t=this;var d=editing._repDays||[];var idx=d.indexOf(${i+1});if(idx>=0)d.splice(idx,1);else d.push(${i+1});editing._repDays=d;t.style.background=d.includes(${i+1})?'var(--g)':'#fff';t.style.color=d.includes(${i+1})?'#fff':'var(--t)';t.style.borderColor=d.includes(${i+1})?'var(--g)':'var(--sep)'" style="width:32px;height:32px;border-radius:50%;border:1.5px solid ${on?'var(--g)':'var(--sep)'};background:${on?'var(--g)':'#fff'};color:${on?'#fff':'var(--t)'};font-size:12px;cursor:pointer;font-weight:500">${d}</button>`;
+        });
+        h += '</div>';
+      }
+      h += '<div class="hint">跨天重复的提醒每天自动重置完成状态</div></div>';
+    }
     +`<div class="frm"><label>提醒内容</label><textarea onchange="editing.message=this.value" rows="2">${r.message||''}</textarea></div>`;
 
   if (baseType(r.type)==='exercise') {
@@ -1001,6 +1044,11 @@ async function saveEdit() {
   if (r._targetDate !== undefined) {
     vidLink = r._targetDate ? 'date:' + r._targetDate : null;
   }
+  // handle repeat config for non-tea reminders
+  let teaOrRep = r.selected_tea_key || null;
+  if (r._repeatMode && baseType(r.type) !== 'tea') {
+    teaOrRep = encodeRepeat(r._repeatMode, r._repDays, r._repDay);
+  }
   await supabase.from('reminders').update({
     type: newType,
     is_enabled: r.is_enabled, time: r.time, message: r.message,
@@ -1008,7 +1056,7 @@ async function saveEdit() {
     interval_minutes: r.interval_minutes||null,
     active_hours_end: r.active_hours_end||null,
     active_hours_start: r.interval_minutes ? r.time : null,
-    video_link: vidLink, selected_tea_key: r.selected_tea_key||null,
+    video_link: vidLink, selected_tea_key: teaOrRep,
   }).eq('id', r.id);
   const local = reminders.find(x=>x.id===r.id);
   if (local) {
@@ -1334,18 +1382,23 @@ async function saveNewBlock() {
 
 
 // ─── Stats ───
+let statDate = new Date(); // selected month/year for calendar
+let statSelectedDate = null; // clicked date for detail view
+
 async function loadHistoricalData() {
   const now = new Date();
-  let start;
+  let start, end;
   if (statMode === 'week') {
-    start = new Date(now);
-    start.setDate(start.getDate() - start.getDay() - 7); // last 2 weeks
+    start = new Date(now); start.setDate(start.getDate() - start.getDay() - 7);
+    end = now;
+  } else if (statMode === 'month') {
+    start = new Date(statDate.getFullYear(), statDate.getMonth(), 1);
+    end = new Date(statDate.getFullYear(), statDate.getMonth()+1, 0);
   } else {
-    start = new Date(now.getFullYear(), now.getMonth()-1, 1); // last 2 months
+    start = new Date(statDate.getFullYear(), 0, 1);
+    end = new Date(statDate.getFullYear(), 11, 31);
   }
-  const startStr = ts(start);
-  const endStr = ts(now);
-
+  const startStr = ts(start); const endStr = ts(end);
   const [compRes, mealRes] = await Promise.all([
     supabase.from('daily_completions').select('*').gte('date', startStr).lte('date', endStr).order('date'),
     supabase.from('meal_entries').select('*').gte('date', startStr).lte('date', endStr).order('date'),
@@ -1357,159 +1410,124 @@ async function loadHistoricalData() {
 
 function switchStat(mode) {
   statMode = mode;
-  document.getElementById('stat-week-btn').style.background = mode==='week' ? 'var(--g)':'#F9F9F9';
-  document.getElementById('stat-week-btn').style.color = mode==='week' ? '#fff':'var(--t)';
-  document.getElementById('stat-month-btn').style.background = mode==='month' ? 'var(--g)':'#F9F9F9';
-  document.getElementById('stat-month-btn').style.color = mode==='month' ? '#fff':'var(--t)';
+  statSelectedDate = null;
+  ['week','month','year'].forEach(m => {
+    const btn = document.getElementById('stat-'+m+'-btn');
+    if (btn) { btn.style.background = mode===m?'var(--g)':'#F9F9F9'; btn.style.color = mode===m?'#fff':'var(--t)'; }
+  });
+  loadHistoricalData();
+}
+function shiftStatMonth(n) {
+  statDate.setMonth(statDate.getMonth() + n);
+  loadHistoricalData();
+}
+function shiftStatYear(n) {
+  statDate.setFullYear(statDate.getFullYear() + n);
   loadHistoricalData();
 }
 
 async function renderStats() {
+  statDate = new Date();
   await loadHistoricalData();
 }
 
 function renderStatContent() {
   const now = new Date();
-  let startDate, periodLabel;
-  if (statMode === 'week') {
-    startDate = new Date(now);
-    startDate.setDate(startDate.getDate() - startDate.getDay() - 7);
-    periodLabel = '最近2周';
-  } else {
-    startDate = new Date(now.getFullYear(), now.getMonth()-1, 1);
-    periodLabel = '最近2月';
-  }
-
-  // Filter data
-  const minDate = ts(startDate);
-  const maxDate = ts(now);
+  const minDate = ts(statMode==='week'?(()=>{let d=new Date(now);d.setDate(d.getDate()-d.getDay()-14);return d;})():new Date(statDate.getFullYear(),statMode==='month'?statDate.getMonth():0,1));
+  const maxDate = ts(statMode==='week'?now:new Date(statDate.getFullYear(),statMode==='month'?statDate.getMonth()+1:12,0));
   const comps = allCompletions.filter(c => c.date >= minDate && c.date <= maxDate);
   const mealsData = allMeals.filter(m => m.date >= minDate && m.date <= maxDate);
 
-  // Completion rate by day
-  const dailyCompCount = {};
-  comps.forEach(c => {
-    dailyCompCount[c.date] = (dailyCompCount[c.date] || 0) + 1;
+  // Per-date data maps
+  const dailyCompCount = {}; comps.forEach(c => { dailyCompCount[c.date] = (dailyCompCount[c.date]||0)+1; });
+  const dailyDietCov = {}; mealsData.forEach(m => {
+    if (!dailyDietCov[m.date]) dailyDietCov[m.date] = new Set();
+    (m.food_groups||[]).forEach(g => { if (FG_DAILY.includes(g)) dailyDietCov[m.date].add(g); });
   });
 
-  // Diet coverage by day
-  const dailyDietCoverage = {};
-  mealsData.forEach(m => {
-    if (!dailyDietCoverage[m.date]) dailyDietCoverage[m.date] = new Set();
-    (m.food_groups || []).forEach(g => {
-      if (FG_DAILY.includes(g)) {
-        dailyDietCoverage[m.date].add(g);
-      }
-    });
-  });
-
-  // Build day list
-  const days = [];
-  let d = new Date(startDate);
-  while (d <= now) {
-    const ds = ts(d);
-    days.push({
-      date: ds,
-      day: d.getDay(),
-      dayName: ['日','一','二','三','四','五','六'][d.getDay()],
-      label: (d.getMonth()+1)+'/'+d.getDate(),
-      month: d.getMonth()+1,
-      dom: d.getDate(),
-    });
-    d.setDate(d.getDate()+1);
+  // Calendar
+  if (statMode !== 'week') {
+    const y = statDate.getFullYear(), m = statDate.getMonth();
+    const firstDay = new Date(y,m,1).getDay(), daysInMonth = new Date(y,m+1,0).getDate();
+    let cal = '<div class="card" style="padding:10px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">';
+    cal += '<button onclick="shiftStatMonth(-1)" style="background:none;border:none;font-size:18px;cursor:pointer;color:var(--g)">‹</button>';
+    cal += '<span style="font-weight:600">'+y+'年'+(m+1)+'月</span>';
+    cal += '<button onclick="shiftStatMonth(1)" style="background:none;border:none;font-size:18px;cursor:pointer;color:var(--g)">›</button>';
+    cal += '</div><div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;text-align:center;font-size:11px;color:var(--s);margin-bottom:4px">';
+    ['日','一','二','三','四','五','六'].forEach(d => cal += '<span>'+d+'</span>');
+    cal += '</div><div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;text-align:center">';
+    for (let i=0;i<firstDay;i++) cal += '<span></span>';
+    for (let d=1;d<=daysInMonth;d++) {
+      const ds = y+'-'+String(m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+      const hasDiet = dailyDietCov[ds] && dailyDietCov[ds].size>0;
+      const hasComp = dailyCompCount[ds] && dailyCompCount[ds]>0;
+      const isToday = ds===ts();
+      const isSel = ds===statSelectedDate;
+      let bg = '#fff', clr = 'var(--t)';
+      if (hasDiet && hasComp) bg = 'rgba(52,199,89,.15)';
+      else if (hasDiet) bg = 'rgba(0,122,255,.08)';
+      else if (hasComp) bg = 'rgba(255,149,0,.08)';
+      if (isToday) bg = 'var(--g)'; clr = '#fff';
+      if (isSel) { bg = 'var(--p)'; clr = '#fff'; }
+      cal += '<div onclick="statSelectedDate=\''+ds+'\';renderStatContent()" style="padding:4px 2px;border-radius:6px;background:'+bg+';color:'+clr+';font-size:'+(isToday||isSel?'13px':'12px')+';font-weight:'+(isToday||isSel?'600':'400')+';cursor:pointer">'+d+'</div>';
+    }
+    cal += '</div></div>';
+    document.getElementById('stats-calendar').innerHTML = cal;
+  } else {
+    document.getElementById('stats-calendar').innerHTML = '';
   }
 
+  // Date detail panel
   let html = '';
+  if (statSelectedDate) {
+    const ds = statSelectedDate;
+    const dayComps = comps.filter(c => c.date===ds);
+    const dayMeals = mealsData.filter(m => m.date===ds);
+    const dayCov = dailyDietCov[ds] || new Set();
+    const tcmDay = tcmLogs.filter(l => l.date===ds);
+    const tcmDayScore = tcmScores[ds] || {};
 
-  // ─── Completion Trend ───
-  html += '<div class="card"><div style="font-weight:600;margin-bottom:8px">📈 提醒完成趋势</div>';
-  html += '<div style="display:flex;gap:1px;align-items:flex-end;overflow-x:auto;padding-bottom:4px">';
-  const maxComp = Math.max(1, ...days.map(d => dailyCompCount[d.date]||0));
-  days.forEach(d => {
-    const c = dailyCompCount[d.date] || 0;
-    const h = Math.max(4, (c/maxComp)*60);
-    const today = d.date === ts();
-    const w = statMode==='month'?'16':'28';
-    html += `<div style="flex-shrink:0;text-align:center;width:${w}px" title="${d.date}: ${c}次完成">
-      <div style="font-size:9px;color:var(--s)">${c||''}</div>
-      <div style="height:${h}px;background:${today?'var(--g)':'var(--g)4d'};border-radius:2px 2px 0 0;margin:1px auto 0;width:${statMode==='month'?'12':'20'}px"></div>
-      <div style="font-size:9px;color:${today?'var(--g)':'var(--s)'};margin-top:2px">${d.label}</div>
-    </div>`;
-  });
-  html += '</div></div>';
+    html += '<div class="card" style="margin-bottom:10px;border-left:3px solid var(--p)"><div style="font-weight:600;font-size:14px;margin-bottom:8px">📋 '+ds+' 详情</div>';
+    // completions
+    html += '<div style="margin-bottom:6px"><span style="font-weight:500">✅ 打卡：</span>'+(dayComps.length>0?dayComps.map(c=>{const r=reminders.find(x=>x.id===c.reminder_id);return emoji(r?r.type:'')+' '+(r?r.title:'');}).join(' · '):'<span style="color:var(--s)">无</span>')+'</div>';
+    // diet
+    html += '<div style="margin-bottom:6px"><span style="font-weight:500">🥗 饮食覆盖率：</span>'+(dayCov.size>0?Math.round(dayCov.size/FG_DAILY.length*100)+'%（'+[...dayCov].map(g=>FG[g]?FG[g].em+'':'').join(' ')+')':'<span style="color:var(--s)">无记录</span>')+'</div>';
+    // tcm
+    const tcmScoreParts = [];
+    if (tcmDayScore.energy) tcmScoreParts.push('⚡'+tcmDayScore.energy);
+    if (tcmDayScore.sleep) tcmScoreParts.push('🌙'+tcmDayScore.sleep);
+    if (tcmDayScore.mood) tcmScoreParts.push('💛'+tcmDayScore.mood);
+    if (tcmDayScore.discomfort) tcmScoreParts.push('🤒'+tcmDayScore.discomfort);
+    if (tcmDay.length>0) tcmScoreParts.push('📝'+tcmDay.length+'条记录');
+    html += '<div><span style="font-weight:500">🌿 养生：</span>'+(tcmScoreParts.length>0?tcmScoreParts.join(' · '):'<span style="color:var(--s)">无记录</span>')+'</div>';
+    html += '</div>';
+  }
 
-  // ─── Diet Trend ───
+  // Summary cards
   const dietTotal = FG_DAILY.length;
-  html += `<div class="card"><div style="font-weight:600;margin-bottom:8px">🥗 饮食覆盖率趋势（每日核心${dietTotal}类）</div>`;
-  html += '<div style="display:flex;gap:1px;align-items:flex-end;overflow-x:auto;padding-bottom:4px">';
-  days.forEach(d => {
-    const c = (dailyDietCoverage[d.date] || new Set()).size;
-    const pct = c / dietTotal;
-    const h = Math.max(4, pct*60);
-    const today = d.date === ts();
-    const w = statMode==='month'?'16':'28';
-    html += `<div style="flex-shrink:0;text-align:center;width:${w}px" title="${d.date}: ${c}/7类食物">
-      <div style="font-size:9px;color:var(--s)">${c||''}</div>
-      <div style="height:${h}px;background:${today?'var(--b)':'#007AFF4d'};border-radius:2px 2px 0 0;margin:1px auto 0;width:${statMode==='month'?'12':'20'}px"></div>
-      <div style="font-size:9px;color:${today?'var(--g)':'var(--s)'};margin-top:2px">${d.label}</div>
-    </div>`;
-  });
+  const totalDays = Math.max(1, (new Date(maxDate)-new Date(minDate))/86400000+1);
+  const daysWithComps = new Set(comps.map(c=>c.date)).size;
+  const totalComps = comps.length;
+  const avgDiet = Math.round(Object.values(dailyDietCov).reduce((s,v)=>s+v.size/dietTotal,0)/Math.max(1,Object.keys(dailyDietCov).length)*100);
+
+  html += '<div class="card" style="margin-bottom:10px"><div style="font-weight:600;margin-bottom:10px">📊 '+(statMode==='week'?'本周':statMode==='month'?'本月':'今年')+'概览</div>';
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;text-align:center">';
+  html += '<div style="background:#F2F2F7;border-radius:10px;padding:10px"><div style="font-size:22px;font-weight:700;color:var(--g)">'+daysWithComps+'/'+Math.round(totalDays)+'</div><div style="font-size:11px;color:var(--s)">打卡天数</div></div>';
+  html += '<div style="background:#F2F2F7;border-radius:10px;padding:10px"><div style="font-size:22px;font-weight:700;color:var(--g)">'+totalComps+'</div><div style="font-size:11px;color:var(--s)">完成次数</div></div>';
+  html += '<div style="background:#F2F2F7;border-radius:10px;padding:10px"><div style="font-size:22px;font-weight:700;color:var(--b)">'+(totalComps/Math.max(1,totalDays)).toFixed(1)+'</div><div style="font-size:11px;color:var(--s)">日均完成</div></div>';
+  html += '<div style="background:#F2F2F7;border-radius:10px;padding:10px"><div style="font-size:22px;font-weight:700;color:var(--b)">'+avgDiet+'%</div><div style="font-size:11px;color:var(--s)">饮食覆盖率</div></div>';
   html += '</div></div>';
 
-  // ─── Summary Numbers ───
-  const totalDays = days.length;
-  const daysWithCompletions = new Set(comps.map(c=>c.date)).size;
-  const daysWithMeals = new Set(mealsData.map(m=>m.date)).size;
-  const totalCompletions = comps.length;
-  const avgDailyComp = totalDays > 0 ? (totalCompletions / totalDays).toFixed(1) : '0.0';
-  const dietPcts = days.map(d => (dailyDietCoverage[d.date]||new Set()).size/dietTotal);
-  const avgDietPct = dietPcts.length > 0 ? (dietPcts.reduce((a,b)=>a+b,0)/dietPcts.length*100).toFixed(0) : 0;
-
-  html += `<div class="card">
-    <div style="font-weight:600;margin-bottom:12px">📋 ${periodLabel}总结</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;text-align:center">
-      <div style="background:#F2F2F7;border-radius:10px;padding:12px">
-        <div style="font-size:24px;font-weight:700;color:var(--g)">${daysWithCompletions}/${totalDays}</div>
-        <div style="font-size:12px;color:var(--s)">有打卡天数</div>
-      </div>
-      <div style="background:#F2F2F7;border-radius:10px;padding:12px">
-        <div style="font-size:24px;font-weight:700;color:var(--g)">${totalCompletions}</div>
-        <div style="font-size:12px;color:var(--s)">总完成次数</div>
-      </div>
-      <div style="background:#F2F2F7;border-radius:10px;padding:12px">
-        <div style="font-size:24px;font-weight:700;color:var(--b)">${avgDailyComp}</div>
-        <div style="font-size:12px;color:var(--s)">日均完成</div>
-      </div>
-      <div style="background:#F2F2F7;border-radius:10px;padding:12px">
-        <div style="font-size:24px;font-weight:700;color:var(--b)">${avgDietPct}%</div>
-        <div style="font-size:12px;color:var(--s)">饮食覆盖率</div>
-      </div>
-    </div>
-  </div>`;
-
-  // ─── Top Completed Reminders ───
+  // Top reminders
   const reminderCompCounts = {};
-  comps.forEach(c => {
-    reminderCompCounts[c.reminder_id] = (reminderCompCounts[c.reminder_id]||0)+1;
-  });
-  const topReminders = reminders
-    .filter(r => reminderCompCounts[r.id])
-    .sort((a,b) => (reminderCompCounts[b.id]||0)-(reminderCompCounts[a.id]||0))
-    .slice(0, 5);
-
-  if (topReminders.length > 0) {
-    html += `<div class="card">
-      <div style="font-weight:600;margin-bottom:8px">🏆 完成最多的提醒</div>
-      ${topReminders.map((r,i) => {
-        const cnt = reminderCompCounts[r.id]||0;
-        return `<div style="display:flex;align-items:center;gap:8px;padding:4px 0">
-          <span style="font-weight:600;color:var(--s);width:20px">${i+1}</span>
-          <span>${emoji(r.type)} ${r.title}</span>
-          <span style="margin-left:auto;font-weight:600;color:var(--g)">${cnt}次</span>
-          <div class="bar" style="width:80px"><div class="bar-f" style="width:${Math.round(cnt/Math.max(1,topReminders[0]?reminderCompCounts[topReminders[0].id]||1:1)*100)}%"></div></div>
-        </div>`;
-      }).join('')}
-    </div>`;
+  comps.forEach(c => { reminderCompCounts[c.reminder_id] = (reminderCompCounts[c.reminder_id]||0)+1; });
+  const top = reminders.filter(r => reminderCompCounts[r.id]).sort((a,b)=>(reminderCompCounts[b.id]||0)-(reminderCompCounts[a.id]||0)).slice(0,4);
+  if (top.length>0) {
+    html += '<div class="card"><div style="font-weight:600;margin-bottom:6px">🏆 完成排行</div>';
+    top.forEach((r,i) => {
+      html += '<div style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:13px"><span style="color:var(--s);width:16px">'+(i+1)+'</span>'+emoji(r.type)+' '+r.title+'<span style="margin-left:auto;font-weight:600">'+(reminderCompCounts[r.id]||0)+'次</span></div>';
+    });
+    html += '</div>';
   }
 
   document.getElementById('stats-content').innerHTML = html;
