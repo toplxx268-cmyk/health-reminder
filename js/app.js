@@ -132,7 +132,7 @@ function goTab(name) {
   document.getElementById('pane-'+name).classList.add('on');
   document.querySelectorAll('#tabs button').forEach(b => b.classList.remove('on'));
   event?.target?.closest('button')?.classList.add('on');
-  document.getElementById('top-title').textContent = {dashboard:'今日提醒',settings:'提醒设置',diet:'饮食记录'}[name]||'健康提醒';
+  document.getElementById('top-title').textContent = {dashboard:'今日提醒',settings:'中医养生',diet:'饮食记录'}[name]||'健康提醒';
 
   if (name === 'dashboard') renderDash();
   if (name === 'settings')   renderSett();
@@ -288,19 +288,31 @@ function _isInterval(r) { return r.interval_minutes && r.interval_minutes > 0; }
 // ─── Settings ───
 // ─── TCM Wellness ───
 let tcmSelected = new Set();
+let tcmCustomSymptoms = [];
+let tcmLogs = [];
 
 function renderSett() {
   renderTCM();
 }
 
 function renderTCM() {
+  // load TCM logs
+  loadTCMLogs();
+
   // Symptom tags
   const tagEl = document.getElementById('tcm-symptom-tags');
   if (!tagEl) return;
-  tagEl.innerHTML = TCM_SYMPTOMS.map(s => {
+  let tagHtml = TCM_SYMPTOMS.map(s => {
     const sel = tcmSelected.has(s.id);
     return `<button onclick="toggleSymptom('${s.id}')" style="padding:6px 12px;border-radius:20px;border:1.5px solid ${sel?'var(--g)':'var(--sep)'};background:${sel?'rgba(52,199,89,.12)':'#fff'};font-size:13px;cursor:pointer;white-space:nowrap">${s.catEm} ${s.nm}</button>`;
   }).join('');
+  // custom symptoms
+  tcmCustomSymptoms.forEach((cs, i) => {
+    tagHtml += `<button onclick="removeCustomSymptom(${i})" style="padding:6px 12px;border-radius:20px;border:1.5px solid var(--b);background:rgba(0,122,255,.1);font-size:13px;cursor:pointer;white-space:nowrap">✏️ ${cs} ✕</button>`;
+  });
+  // input for custom symptom
+  tagHtml += `<input type="text" id="custom-symptom-input" placeholder="输入症状..." style="width:100px;padding:6px 10px;border-radius:20px;border:1.5px dashed var(--sep);font-size:13px;outline:none" onkeydown="if(event.key==='Enter')addCustomSymptom()"><button onclick="addCustomSymptom()" style="padding:6px 10px;border-radius:20px;border:none;background:var(--b);color:#fff;font-size:12px;cursor:pointer">＋</button>`;
+  tagEl.innerHTML = tagHtml;
 
   // Recommendations
   const recEl = document.getElementById('tcm-recommendations');
@@ -377,12 +389,57 @@ function renderTCM() {
     });
   }
 
-  // === Tea ===
+  // Match tea blends by symptom
+  const blends = {};
+  tcmSelected.forEach(sid => {
+    const sym = TCM_SYMPTOMS.find(s => s.id === sid);
+    if (!sym) return;
+    TEA_BLENDS.forEach(b => {
+      const txt = b.for + b.effects.join('');
+      const kwMap = {
+        fatigue: ['乏力','疲劳','气虚','免疫'],
+        insomnia: ['失眠','睡眠','安神','多梦'],
+        poorDigestion: ['消化','胃','食积','腹胀','油腻'],
+        constipation: ['便秘'],
+        bloating: ['腹胀','食积'],
+        coldHands: ['手脚冰凉','寒'],
+        acne: ['清热','解毒'],
+        dryMouth: ['口干'],
+        headache: ['头痛','感冒'],
+        eyeStrain: ['眼','目','用眼'],
+        anxiety: ['情绪','抑郁','心烦'],
+        weightGain: ['减肥','脂','体重'],
+        cold: ['感冒','风热'],
+        menstrual: ['痛经','宫寒','经'],
+        hairLoss: ['乌发','须发'],
+        skinDry: ['皮肤干燥','润肤'],
+      };
+      const kws = kwMap[sid] || [];
+      if (kws.some(kw => txt.includes(kw)) && !blends[b.name]) {
+        blends[b.name] = b;
+      }
+    });
+    // also match custom symptoms by keyword
+    tcmCustomSymptoms.forEach(cs => {
+      TEA_BLENDS.forEach(b => {
+        const txt = b.for + b.effects.join('') + b.name;
+        if (txt.includes(cs) && !blends[b.name]) blends[b.name] = b;
+      });
+    });
+  });
+
+  // === Tea (single + blends) ===
   html += '<div class="st">🍵 茶饮推荐</div>';
-  const teaList = Object.values(teas).slice(0, 6);
-  if (teaList.length === 0) {
+  const teaList = Object.values(teas).slice(0, 4);
+  const blendList = Object.values(blends).slice(0, 4);
+  if (teaList.length === 0 && blendList.length === 0) {
     html += '<div class="card" style="color:var(--s);text-align:center">暂无匹配茶饮</div>';
   } else {
+    // blends first
+    blendList.forEach(b => {
+      html += `<div class="tcm-item"><div class="tcm-food">🍵 ${b.name} <span style="font-size:10px;background:rgba(175,82,222,.1);color:var(--p);padding:1px 6px;border-radius:10px;margin-left:4px">搭配</span><span style="font-size:11px;background:rgba(0,0,0,.06);padding:1px 6px;border-radius:10px;margin-left:4px">性${b.nature}</span></div><div style="font-size:12px;color:var(--s);margin-bottom:2px">配方：${b.ingredients.join('+')} · ${b.recipe}</div><div style="font-size:12px;color:var(--g)">✅ ${b.for}</div><div style="font-size:12px;color:var(--o);margin-top:2px">⚠️ ${b.caution}</div></div>`;
+    });
+    // single teas
     teaList.forEach(t => {
       html += `<div class="tcm-item"><div class="tcm-food">🍵 ${t.name} <span style="font-size:11px;background:rgba(0,0,0,.06);padding:1px 6px;border-radius:10px;margin-left:6px">性${t.nature}</span></div><div style="font-size:12px;color:var(--s)">${t.effects.slice(0,4).join('·')}</div><div style="font-size:12px;color:var(--o);margin-top:2px">⚠️ ${t.caution}</div></div>`;
     });
@@ -398,12 +455,74 @@ function renderTCM() {
     });
   }
 
+  // === TCM Daily Log ===
+  const todayLogs = tcmLogs.filter(l => l.date === ts());
+  html += '<div class="st">📝 今日养生记录</div>';
+  if (todayLogs.length === 0) {
+    html += '<div class="card" style="color:var(--s);text-align:center;padding:16px">今天还没记录养生实践</div>';
+  } else {
+    todayLogs.forEach((l, i) => {
+      html += `<div class="tcm-item" style="display:flex;justify-content:space-between;align-items:center"><div><div style="font-weight:600;font-size:14px">${l.emoji||'✅'} ${l.text}</div><div style="font-size:11px;color:var(--s)">${l.time}</div></div><button onclick="deleteTCMLog('${l.id}')" style="background:none;border:none;color:var(--r);cursor:pointer;font-size:16px">✕</button></div>`;
+    });
+  }
+  // quick record buttons
+  html += `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">${[
+    {emoji:'🍵',text:'喝茶养生'},
+    {emoji:'💆',text:'穴位按摩'},
+    {emoji:'🧘',text:'太极/八段锦'},
+    {emoji:'🦶',text:'泡脚'},
+    {emoji:'☀️',text:'晒太阳'},
+    {emoji:'🧎',text:'冥想静坐'},
+    {emoji:'🍲',text:'食疗调理'},
+    {emoji:'📿',text:'经络推拿'},
+  ].map(q => `<button onclick="addTCMLog('${q.emoji}','${q.text}')" style="padding:6px 12px;border-radius:20px;border:1.5px solid var(--sep);background:#fff;font-size:12px;cursor:pointer">${q.emoji} ${q.text}</button>`).join('')}</div>`;
+  // custom log input
+  html += `<div style="display:flex;gap:6px;margin-top:8px"><input type="text" id="tcm-log-input" placeholder="自定义记录..." style="flex:1;padding:8px 12px;border-radius:20px;border:1.5px dashed var(--sep);font-size:13px;outline:none" onkeydown="if(event.key==='Enter')addCustomTCMLog()"><button onclick="addCustomTCMLog()" style="padding:8px 14px;border-radius:20px;border:none;background:var(--g);color:#fff;font-size:13px;cursor:pointer">记录</button></div>`;
+
   recEl.innerHTML = html;
+}
+
+// TCM Log functions (localStorage)
+function loadTCMLogs() {
+  try { tcmLogs = JSON.parse(localStorage.getItem('tcm_logs')||'[]'); } catch(e) { tcmLogs = []; }
+}
+function saveTCMLogs() {
+  localStorage.setItem('tcm_logs', JSON.stringify(tcmLogs));
+}
+function addTCMLog(emoji, text) {
+  tcmLogs.push({id: Date.now().toString(), emoji, text, date: ts(), time: new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'})});
+  saveTCMLogs();
+  renderTCM();
+}
+function addCustomTCMLog() {
+  const inp = document.getElementById('tcm-log-input');
+  if (!inp || !inp.value.trim()) return;
+  tcmLogs.push({id: Date.now().toString(), emoji: '✅', text: inp.value.trim(), date: ts(), time: new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'})});
+  saveTCMLogs();
+  renderTCM();
+}
+function deleteTCMLog(id) {
+  tcmLogs = tcmLogs.filter(l => l.id !== id);
+  saveTCMLogs();
+  renderTCM();
 }
 
 function toggleSymptom(id) {
   if (tcmSelected.has(id)) tcmSelected.delete(id);
   else tcmSelected.add(id);
+  renderTCM();
+}
+
+function addCustomSymptom() {
+  const inp = document.getElementById('custom-symptom-input');
+  if (!inp || !inp.value.trim()) return;
+  tcmCustomSymptoms.push(inp.value.trim());
+  inp.value = '';
+  renderTCM();
+}
+
+function removeCustomSymptom(i) {
+  tcmCustomSymptoms.splice(i, 1);
   renderTCM();
 }
 
@@ -1154,6 +1273,22 @@ const TEAS = [
   {key:'cassiaSeed',name:'决明子茶',englishName:'Cassia Seed Tea',nature:'微寒',taste:'甘、苦',meridians:'肝、大肠',effects:['清肝明目','润肠通便','降血压','降血脂'],description:'中医明目要药，有"还瞳子"之称。缓解眼干眼涩。',suitableFor:'用眼过度、便秘、高血压、高血脂者',caution:'脾胃虚寒、便溏者不宜；孕妇慎用'},
   {key:'mulberry',name:'桑葚茶',englishName:'Mulberry Tea',nature:'寒',taste:'甘',meridians:'肝、肾',effects:['滋阴补血','生津润燥','乌发明目','抗衰老'],description:'富含花青素、铁、维生素。滋阴补血、生津润燥。',suitableFor:'阴虚血少、须发早白、眼干目涩者',caution:'脾胃虚寒、腹泻者不宜；糖尿病患者注意'},
   {key:'hibiscus',name:'洛神花茶',englishName:'Hibiscus Tea',nature:'凉',taste:'酸',meridians:'肺、胃',effects:['生津止渴','降血压','清热解暑','促进消化','美容养颜'],description:'汤色红宝石，酸甜口感。富含维生素C和花青素。',suitableFor:'高血压、夏季暑热、食欲不振者',caution:'胃酸过多者不宜空腹；孕妇慎用'},
+];
+
+// ─── Data: Tea Blends (混合茶搭配) ───
+const TEA_BLENDS = [
+  {name:'枸杞菊花茶',ingredients:['枸杞','菊花'],nature:'平',effects:['清肝明目','滋补肝肾','缓解眼疲劳'],for:'用眼过度、眼干眼涩、视物模糊',recipe:'枸杞10粒+菊花3-5朵，沸水冲泡5分钟。可反复冲泡至味淡。',caution:'感冒发热期间不宜；脾胃虚寒者菊花减量。'},
+  {name:'玫瑰红枣茶',ingredients:['玫瑰花','红枣'],nature:'温',effects:['疏肝解郁','补气养血','美容养颜'],for:'情绪低落、面色萎黄、经前烦躁',recipe:'玫瑰花5朵+去核红枣3颗，沸水冲泡8分钟。可加少量红糖。',caution:'经期量多者玫瑰花减量；便秘者红枣不宜多。'},
+  {name:'陈皮普洱茶',ingredients:['陈皮','普洱茶'],nature:'温',effects:['理气健脾','消食去腻','暖胃化痰'],for:'饮食油腻、消化不良、饭后腹胀',recipe:'陈皮2g+普洱茶5g，沸水冲泡。陈皮年份越久越佳。',caution:'胃热便秘者慎用；空腹不宜大量饮用。'},
+  {name:'桂圆红枣茶',ingredients:['桂圆','红枣'],nature:'温',effects:['补血安神','养心健脾','改善睡眠'],for:'心血不足、失眠多梦、手脚冰凉',recipe:'桂圆5颗+红枣3颗（去核），煮水10分钟或沸水冲泡。',caution:'体质燥热者不宜；糖尿病患者注意糖分。'},
+  {name:'菊花薄荷茶',ingredients:['菊花','薄荷'],nature:'凉',effects:['疏散风热','清利头目','提神醒脑'],for:'风热感冒初期、头痛、咽喉不适',recipe:'菊花5朵+薄荷叶3-5片，沸水冲泡3分钟（不宜久泡）。',caution:'风寒感冒不宜；体虚多汗者慎用。'},
+  {name:'山楂荷叶茶',ingredients:['山楂','荷叶'],nature:'平',effects:['消食降脂','活血化瘀','利水减肥'],for:'食积不化、高血脂、体重管理',recipe:'山楂3片+荷叶2g，沸水冲泡5-8分钟。饭后饮用。',caution:'胃酸过多者慎用；孕妇忌用。空腹不宜。'},
+  {name:'黄芪枸杞茶',ingredients:['黄芪','枸杞'],nature:'温',effects:['补气固表','养肝明目','增强免疫'],for:'气虚乏力、易感冒、免疫力低下',recipe:'黄芪5g+枸杞10粒，沸水冲泡10分钟或煮水。',caution:'感冒发热期间不宜；高血压者黄芪减量。'},
+  {name:'金银花甘草茶',ingredients:['金银花','甘草'],nature:'凉',effects:['清热解毒','利咽消肿','抗病毒'],for:'咽喉肿痛、口腔溃疡、风热感冒',recipe:'金银花3g+甘草2片，沸水冲泡5分钟。',caution:'脾胃虚寒者不宜久服；甘草不宜长期大量。'},
+  {name:'姜枣红糖茶',ingredients:['生姜','红枣','红糖'],nature:'温',effects:['温经散寒','补血暖宫','缓解痛经'],for:'宫寒痛经、风寒感冒、手脚冰凉',recipe:'生姜3片+红枣3颗（去核）+红糖适量，煮水10分钟趁热服用。',caution:'阴虚火旺、口干舌燥者不宜；晚上不宜大量饮用。'},
+  {name:'桑葚枸杞茶',ingredients:['桑葚','枸杞'],nature:'平',effects:['滋阴补血','养肝明目','乌发润肤'],for:'用眼过度、须发早白、皮肤干燥',recipe:'桑葚干10g+枸杞10粒，沸水冲泡或煮水。',caution:'脾胃虚寒腹泻者不宜；糖尿病患者适量。'},
+  {name:'百合莲子茶',ingredients:['百合','莲子'],nature:'平',effects:['清心安神','润肺止咳','健脾止泻'],for:'心烦失眠、干咳无痰、脾胃虚弱',recipe:'百合10g+莲子10g（去心），煮水15分钟。可加少量冰糖。',caution:'风寒咳嗽不宜；莲子心苦寒可去之。'},
+  {name:'茯苓薏米茶',ingredients:['茯苓','薏苡仁'],nature:'平',effects:['健脾祛湿','利水消肿','美白肌肤'],for:'脾虚湿盛、水肿、大便黏腻',recipe:'茯苓10g+薏苡仁15g（提前浸泡2小时），煮水20分钟。',caution:'阴虚口干者不宜；薏苡仁孕妇忌用。'},
 ];
 
 // ─── Data: TCM Symptom-Recommendation Engine ───
