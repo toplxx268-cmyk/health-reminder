@@ -518,7 +518,8 @@ function renderLogForm() {
   }
 
   document.getElementById('meal-body').innerHTML =
-    `<div class="frm"><label>餐次</label><div class="mt-sel">${Object.entries(MT).map(([k,v])=>`<button class="mt-btn ${logMealType===k?'sel':''}" onclick="setMT('${k}')">${v.em} ${v.nm}</button>`).join('')}</div></div>`
+    `<div class="frm"><label>🤖 智能输入（输入吃了什么，自动分类）</label><div style="display:flex;gap:8px"><input type="text" id="ai-food-input" placeholder="例如：早餐吃了菠菜鸡蛋和燕麦" style="flex:1;padding:10px;border-radius:10px;border:1.5px solid var(--sep);font-size:15px"><button onclick="aiClassify()" style="padding:10px 16px;background:var(--b);color:#fff;border:none;border-radius:10px;font-size:14px;cursor:pointer;white-space:nowrap">识别</button></div><div id="ai-result" style="margin-top:6px;font-size:12px;color:var(--s)"></div></div>`
+    + `<div class="frm"><label>餐次</label><div class="mt-sel">${Object.entries(MT).map(([k,v])=>`<button class="mt-btn ${logMealType===k?'sel':''}" onclick="setMT('${k}')">${v.em} ${v.nm}</button>`).join('')}</div></div>`
     + fgBtns(daily,'🥇 每日核心')
     + fgBtns(weekly,'📆 适量摄入')
     + fgBtns(limited,'⚠️ 注意限量')
@@ -527,6 +528,28 @@ function renderLogForm() {
 
 function setMT(k) { logMealType = k; renderLogForm(); }
 function togFG(k) { if (logGroups.has(k)) logGroups.delete(k); else logGroups.add(k); renderLogForm(); }
+
+function aiClassify() {
+  const input = document.getElementById('ai-food-input');
+  const result = document.getElementById('ai-result');
+  if (!input || !input.value.trim()) { result.textContent = '请输入食物描述'; return; }
+  const matched = classifyFood(input.value);
+  if (matched.length === 0) {
+    result.innerHTML = '<span style="color:var(--o)">未识别到食物，请手动选择下方分类</span>';
+    return;
+  }
+  // auto-select matched groups
+  matched.forEach(k => logGroups.add(k));
+  renderLogForm();
+  // show result summary
+  const names = matched.map(k => FG[k].em + FG[k].nm).join('、');
+  result.innerHTML = `<span style="color:var(--g)">✅ 识别到：${names}</span>`;
+  // restore input value after re-render
+  setTimeout(() => {
+    const inp = document.getElementById('ai-food-input');
+    if (inp) inp.value = input.value;
+  }, 50);
+}
 
 async function saveMeal() {
   if (logGroups.size===0) return;
@@ -907,6 +930,89 @@ const FG_DAILY  = Object.keys(FG).filter(k => FG[k].cat === 'veg' || FG[k].cat =
 const FG_WEEKLY = Object.keys(FG).filter(k => FG[k].cat === 'weekly'); // 4 items
 const FG_LIMIT  = Object.keys(FG).filter(k => FG[k].cat === 'limited'); // 2 items
 const FG_VEG    = Object.keys(FG).filter(k => FG[k].cat === 'veg');     // 5 vegetable sub-types
+
+// ─── AI Food Classifier: keyword → FG key ───
+const FOOD_KW = {
+  // 叶菜类
+  '菠菜':'vegLeafy','生菜':'vegLeafy','油菜':'vegLeafy','茼蒿':'vegLeafy','小白菜':'vegLeafy','芝麻菜':'vegLeafy',
+  '空心菜':'vegLeafy','苋菜':'vegLeafy','芥菜':'vegLeafy','娃娃菜':'vegLeafy','大白菜':'vegLeafy','卷心菜':'vegCruciferous',
+  '青菜':'vegLeafy','菜心':'vegLeafy','油麦菜':'vegLeafy','豌豆苗':'vegLeafy','芽苗菜':'vegLeafy','苦菊':'vegLeafy',
+  // 十字花科
+  '西兰花':'vegCruciferous','花椰菜':'vegCruciferous','西蓝花':'vegCruciferous','菜花':'vegCruciferous',
+  '卷心菜':'vegCruciferous','甘蓝':'vegCruciferous','羽衣甘蓝':'vegCruciferous','芥蓝':'vegCruciferous',
+  '抱子甘蓝':'vegCruciferous','白萝卜':'vegRoot','芜菁':'vegRoot','雪里蕻':'vegCruciferous',
+  // 果菜类
+  '番茄':'vegFruit','西红柿':'vegFruit','彩椒':'vegFruit','柿子椒':'vegFruit','青椒':'vegFruit','甜椒':'vegFruit',
+  '茄子':'vegFruit','黄瓜':'vegFruit','西葫芦':'vegFruit','秋葵':'vegFruit','南瓜':'vegFruit',
+  '辣椒':'vegFruit','朝天椒':'vegFruit','丝瓜':'vegFruit','苦瓜':'vegFruit','冬瓜':'vegFruit',
+  // 根茎类
+  '胡萝卜':'vegRoot','萝卜':'vegRoot','胡萝卜':'vegRoot','白萝卜':'vegRoot','甜菜':'vegRoot','红薯':'vegRoot',
+  '山药':'vegRoot','莲藕':'vegRoot','土豆':'vegRoot','马铃薯':'vegRoot','芋头':'vegRoot','莴笋':'vegRoot',
+  '竹笋':'vegRoot','芦笋':'vegRoot','茭白':'vegRoot','牛蒡':'vegRoot','紫薯':'vegRoot',
+  // 葱蒜类
+  '洋葱':'vegAllium','大蒜':'vegAllium','蒜':'vegAllium','韭菜':'vegAllium','葱':'vegAllium','蒜苗':'vegAllium',
+  '红葱头':'vegAllium','大葱':'vegAllium','小葱':'vegAllium','蒜薹':'vegAllium','韭黄':'vegAllium',
+  // 水果
+  '苹果':'fruits','橙子':'fruits','橘子':'fruits','葡萄':'fruits','石榴':'fruits','无花果':'fruits',
+  '莓果':'fruits','蓝莓':'fruits','草莓':'fruits','香蕉':'fruits','梨':'fruits','西瓜':'fruits',
+  '芒果':'fruits','木瓜':'fruits','猕猴桃':'fruits','桃子':'fruits','樱桃':'fruits','柚子':'fruits',
+  '柠檬':'fruits','火龙果':'fruits','柿子':'fruits','荔枝':'fruits','龙眼':'fruits','菠萝':'fruits',
+  '蜜瓜':'fruits','哈密瓜':'fruits',
+  // 全谷物
+  '藜麦':'wholeGrains','燕麦':'wholeGrains','糙米':'wholeGrains','全麦面包':'wholeGrains','全麦':'wholeGrains',
+  '意面':'wholeGrains','荞麦':'wholeGrains','小米':'wholeGrains','玉米':'wholeGrains','黑米':'wholeGrains',
+  '紫米':'wholeGrains','高粱':'wholeGrains','大麦':'wholeGrains','青稞':'wholeGrains','全谷物':'wholeGrains',
+  // 豆类
+  '鹰嘴豆':'legumes','扁豆':'legumes','蚕豆':'legumes','白豆':'legumes','小扁豆':'legumes','毛豆':'legumes',
+  '黄豆':'legumes','绿豆':'legumes','红豆':'legumes','黑豆':'legumes','豌豆':'legumes','芸豆':'legumes',
+  '豆腐':'legumes','豆制品':'legumes','豆浆':'legumes','豆皮':'legumes','腐竹':'legumes','豆腐干':'legumes',
+  '千张':'legumes','豆豉':'legumes','纳豆':'legumes','天贝':'legumes',
+  // 坚果种子
+  '杏仁':'nuts','核桃':'nuts','腰果':'nuts','松子':'nuts','芝麻':'nuts','亚麻籽':'nuts',
+  '开心果':'nuts','花生':'nuts','瓜子':'nuts','南瓜籽':'nuts','奇亚籽':'nuts','榛子':'nuts',
+  '夏威夷果':'nuts','碧根果':'nuts','葵花籽':'nuts',
+  // 橄榄油
+  '橄榄油':'oliveOil','特级初榨':'oliveOil','初榨橄榄油':'oliveOil',
+  // 香草香料
+  '迷迭香':'herbs','百里香':'herbs','牛至':'herbs','罗勒':'herbs','欧芹':'herbs',
+  '香料':'herbs','香草':'herbs','薄荷':'herbs','紫苏':'herbs','香菜':'herbs','茴香':'herbs',
+  '姜黄':'herbs','肉桂':'herbs','孜然':'herbs','丁香':'herbs',
+  // 鱼虾海鲜
+  '三文鱼':'fish','沙丁鱼':'fish','鳕鱼':'fish','虾':'fish','贻贝':'fish','鲭鱼':'fish',
+  '鱼':'fish','海鲜':'fish','贝类':'fish','鲈鱼':'fish','带鱼':'fish','金枪鱼':'fish',
+  '海鲈':'fish','青花鱼':'fish','秋刀鱼':'fish','牡蛎':'fish','蛤蜊':'fish','扇贝':'fish',
+  '鱿鱼':'fish','章鱼':'fish','螃蟹':'fish','蟹':'fish','龙虾':'fish','鳗鱼':'fish',
+  // 禽肉
+  '鸡肉':'poultry','鸡胸':'poultry','鸡腿':'poultry','鸭肉':'poultry','火鸡':'poultry','鹌鹑':'poultry',
+  '鸽子':'poultry','禽肉':'poultry','鸡':'poultry','鸭':'poultry',
+  // 鸡蛋
+  '鸡蛋':'eggs','蛋':'eggs','鹌鹑蛋':'eggs','鸭蛋':'eggs','蛋黄':'eggs','蛋白':'eggs',
+  // 乳制品
+  '酸奶':'dairy','希腊酸奶':'dairy','奶酪':'dairy','芝士':'dairy','羊奶酪':'dairy',
+  '牛奶':'dairy','开菲尔':'dairy','乳制品':'dairy','奶':'dairy','黄油':'dairy','奶油':'dairy',
+  // 红肉
+  '牛肉':'redMeat','猪肉':'redMeat','羊肉':'redMeat','红肉':'redMeat','加工肉':'redMeat',
+  '培根':'redMeat','火腿':'redMeat','香肠':'redMeat','腊肉':'redMeat','牛排':'redMeat',
+  '排骨':'redMeat',
+  // 甜食
+  '蛋糕':'sweets','糖果':'sweets','含糖饮料':'sweets','冰淇淋':'sweets','甜食':'sweets',
+  '饼干':'sweets','巧克力':'sweets','甜点':'sweets','奶茶':'sweets','汽水':'sweets','可乐':'sweets',
+  '果汁饮料':'sweets','果酱':'sweets',
+};
+
+function classifyFood(text) {
+  // Parse text, match keywords, return array of FG keys
+  const found = new Set();
+  const t = text.toLowerCase();
+  // match longest keywords first
+  const sorted = Object.entries(FOOD_KW).sort((a,b) => b[0].length - a[0].length);
+  for (const [kw, fg] of sorted) {
+    if (t.includes(kw) && !found.has(fg)) {
+      found.add(fg);
+    }
+  }
+  return Array.from(found);
+}
 
 const MT = {
   breakfast:{em:'🌅',nm:'早餐'}, lunch:{em:'☀️',nm:'午餐'},
