@@ -17,7 +17,7 @@ serve(async (req: Request) => {
 
   try {
     const body = await req.json();
-    const { symptom, apiKey, endpoint, model: userModel } = body;
+    const { symptom, apiKey, endpoint, model: userModel, prompt: customPrompt } = body;
 
     if (!symptom || !apiKey) {
       return new Response(
@@ -29,13 +29,13 @@ serve(async (req: Request) => {
     const apiEndpoint = endpoint || "https://api.groq.com/openai/v1/chat/completions";
     const model = userModel || (apiEndpoint.includes("groq") ? "llama-3.3-70b-versatile" : "gpt-4o-mini");
 
-    const prompt = `你是中医养生专家。请针对以下症状给出中医分析及推荐。严格按JSON格式输出，不要markdown代码块：
+    const prompt = customPrompt || `你是中医养生专家。请针对以下症状给出中医分析及推荐。严格按JSON格式输出：
 {
-  "analysis": "中医辨证分析（150字内，说明症状所属证型、病位、病机，给出调理原则）",
-  "foods": [{"food":"食物名","nature":"性味","action":"功效","note":"用法"}],
-  "teas": [{"key":"拼音","name":"茶名","nature":"性味","effects":["功效"],"caution":"注意"}],
-  "medications":[{"name":"中成药名/单味药名","type":"中成药/单味药","action":"功效主治","note":"用法用量与注意事项"}],
-  "points": [{"point":"穴位名","meridian":"经络","loc":"位置","tech":"手法"}]
+  "analysis": "中医辨证分析（150字内）",
+  "foods": [{"food":"食物","nature":"性味","action":"功效","note":"用法"}],
+  "teas": [{"key":"拼音","name":"茶名","nature":"性味","effects":[],"caution":""}],
+  "medications":[{"name":"药名","type":"中成药/单味药","action":"功效","note":"用法"}],
+  "points": [{"point":"穴位","meridian":"经络","loc":"位置","tech":"手法"}]
 }
 症状：${symptom}`;
 

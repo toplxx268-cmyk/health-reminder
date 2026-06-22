@@ -584,19 +584,20 @@ async function callTCMAI() {
       const data = await res.json();
       text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
     } else {
-      // OpenAI-compatible API (Groq, OpenAI, etc.)
-      const res = await fetch(apiEndpoint, {
+      // Non-Gemini APIs → route through Supabase Edge Function to bypass mobile Safari CORS
+      const proxyUrl = SUPABASE_URL + '/functions/v1/tcm-ai';
+      const res = await fetch(proxyUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tcmAIKey },
-        body: JSON.stringify({ model, messages: [{role:'user',content:tcmPrompt}], max_tokens: 2048, temperature: 0.7 }),
+        headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY },
+        body: JSON.stringify({ symptom: symptomText, apiKey: tcmAIKey, endpoint: apiEndpoint, model, prompt: tcmPrompt }),
         signal: AbortSignal.timeout(45000)
       });
       if (!res.ok) {
         const ed = await res.json().catch(()=>({}));
-        throw new Error(ed.error?.message || ed.error?.code || ('HTTP '+res.status));
+        throw new Error(ed.error || ('HTTP '+res.status));
       }
-      const data = await res.json();
-      text = data.choices?.[0]?.message?.content || '';
+      const result = await res.json();
+      text = result.text || '';
     }
     if (!text) throw new Error('API 返回为空，请检查 Key 是否正确');
     // strip markdown fences
