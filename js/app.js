@@ -985,11 +985,12 @@ function renderEditForm() {
       <option value="10" ${r.interval_minutes===10?'selected':''}>10 分钟</option>
       <option value="20" ${r.interval_minutes===20?'selected':''}>20 分钟</option>
       <option value="30" ${r.interval_minutes===30?'selected':''}>30 分钟</option>
-      <option value="45" ${r.interval_minutes===45?'selected':''}>45 分钟</option>
-      <option value="60" ${r.interval_minutes===60?'selected':''}>60 分钟</option>
-      <option value="90" ${r.interval_minutes===90?'selected':''}>90 分钟</option>
-      <option value="120" ${r.interval_minutes===120?'selected':''}>120 分钟</option>
-    </select><div class="hint">设置后在活跃时段内每隔所选时间重复提醒</div></div>`;
+      <option value="60" ${r.interval_minutes===60?'selected':''}>1 小时</option>
+      <option value="120" ${r.interval_minutes===120?'selected':''}>2 小时</option>
+      <option value="180" ${r.interval_minutes===180?'selected':''}>3 小时</option>
+      <option value="360" ${r.interval_minutes===360?'selected':''}>6 小时</option>
+      <option value="720" ${r.interval_minutes===720?'selected':''}>12 小时</option>
+    </select><div class="hint">日内重复，设置后在活跃时段内每隔所选时间提醒</div></div>`;
     // daily/weekly/monthly repeat (for non-task reminders)
     if (!_isBlock(r)) {
       const repInfo = parseRepeat(r);
@@ -1319,8 +1320,8 @@ function showNewReminder() {
     <div class="frm"><label>提醒内容</label><textarea onchange="newReminder.message=this.value" rows="2" placeholder="显示在通知和仪表盘上"></textarea></div>
     <div class="frm"><label>重复间隔（可选）</label><select onchange="newReminder.interval_minutes=this.value?parseInt(this.value):null">
       <option value="">不重复</option><option value="5">5分钟</option><option value="10">10分钟</option>
-      <option value="20">20分钟</option><option value="30">30分钟</option><option value="60">60分钟</option>
-      <option value="90">90分钟</option><option value="120">120分钟</option>
+      <option value="20">20分钟</option><option value="30">30分钟</option><option value="60">1小时</option><option value="120">2小时</option>
+      <option value="180">3小时</option><option value="360">6小时</option><option value="720">12小时</option>
     </select></div>
   `;
   document.getElementById('mod-new').style.display = 'flex';
@@ -1450,8 +1451,29 @@ function renderStatContent() {
     (m.food_groups||[]).forEach(g => { if (FG_DAILY.includes(g)) dailyDietCov[m.date].add(g); });
   });
 
-  // Calendar
-  if (statMode !== 'week') {
+  // Calendar or week strip
+  if (statMode === 'week') {
+    // Weekly date strip
+    const weekStart = new Date(minDate);
+    let wk = '<div class="card" style="padding:10px;margin-bottom:10px"><div style="display:flex;gap:4px;text-align:center">';
+    const dayNames = ['日','一','二','三','四','五','六'];
+    for (let i=0;i<7;i++) {
+      const d = new Date(weekStart); d.setDate(d.getDate()+i);
+      const ds = ts(d); const isToday = ds===ts(); const isSel = ds===statSelectedDate;
+      const hasDiet = dailyDietCov[ds] && dailyDietCov[ds].size>0;
+      const hasComp = dailyCompCount[ds] && dailyCompCount[ds]>0;
+      let bg = '#fff', clr = '#1C1C1E';
+      if (hasDiet&&hasComp) bg='rgba(52,199,89,.15)'; else if (hasDiet) bg='rgba(0,122,255,.08)'; else if (hasComp) bg='rgba(255,149,0,.08)';
+      if (isToday) { bg='#34C759'; clr='#fff'; } if (isSel) { bg='#AF52DE'; clr='#fff'; }
+      wk += '<div onclick="statSelectedDate=\''+ds+'\';renderStatContent()" style="flex:1;padding:6px 2px;border-radius:8px;background:'+bg+';color:'+clr+';cursor:pointer;font-size:'+(isToday||isSel?'13px':'11px')+'">';
+      wk += '<div style="font-size:10px;opacity:.7">'+dayNames[d.getDay()]+'</div>';
+      wk += '<div style="font-weight:'+(isToday||isSel?'700':'500')+'">'+d.getDate()+'</div>';
+      wk += '<div style="font-size:9px;margin-top:1px">'+(dailyCompCount[ds]||0)+'✓ '+(dailyDietCov[ds]||new Set()).size+'🥗</div>';
+      wk += '</div>';
+    }
+    wk += '</div></div>';
+    document.getElementById('stats-calendar').innerHTML = wk;
+  } else {
     const y = statDate.getFullYear(), m = statDate.getMonth();
     const firstDay = new Date(y,m,1).getDay(), daysInMonth = new Date(y,m+1,0).getDate();
     let cal = '<div class="card" style="padding:10px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">';
@@ -1478,8 +1500,6 @@ function renderStatContent() {
     }
     cal += '</div></div>';
     document.getElementById('stats-calendar').innerHTML = cal;
-  } else {
-    document.getElementById('stats-calendar').innerHTML = '';
   }
 
   // Date detail panel
@@ -1529,6 +1549,26 @@ function renderStatContent() {
   // diet coverage bar chart
   html += '<div style="background:#F2F2F7;border-radius:10px;padding:10px"><div style="font-size:22px;font-weight:700;color:var(--b)">'+avgDiet+'%</div><div style="font-size:11px;color:var(--s);margin-bottom:4px">饮食覆盖率</div><div class="bar" style="height:6px"><div class="bar-f" style="width:'+avgDiet+'%;background:var(--b)"></div></div></div>';
   html += '</div></div>';
+
+  // Daily diet coverage bar chart
+  html += '<div class="card" style="margin-bottom:10px"><div style="font-weight:600;margin-bottom:8px">🥗 每日饮食覆盖（核心'+dietTotal+'类）</div>';
+  if (statMode==='week') {
+    for (let i=0;i<7;i++) {
+      const d = new Date(minDate); d.setDate(d.getDate()+i); const ds = ts(d);
+      const cov = (dailyDietCov[ds]||new Set()).size;
+      html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><span style="font-size:11px;color:var(--s);width:36px">'+['日','一','二','三','四','五','六'][d.getDay()]+' '+(d.getMonth()+1)+'/'+d.getDate()+'</span><div class="bar" style="flex:1;height:14px"><div class="bar-f" style="width:'+(cov/dietTotal*100)+'%;background:var(--b);border-radius:2px;min-width:2px"></div></div><span style="font-size:11px;font-weight:600;width:28px;color:var(--b)">'+cov+'/'+dietTotal+'</span></div>';
+    }
+  } else {
+    // month/year: show by-day bars
+    const days = [];
+    let cur = new Date(minDate);
+    while (cur <= new Date(maxDate)) { days.push(ts(cur)); cur.setDate(cur.getDate()+1); }
+    days.forEach(ds => {
+      const cov = (dailyDietCov[ds]||new Set()).size;
+      html += '<div style="display:flex;align-items:center;gap:4px;margin-bottom:2px"><span style="font-size:9px;color:var(--s);width:36px">'+ds.slice(5)+'</span><div class="bar" style="flex:1;height:10px"><div class="bar-f" style="width:'+(cov/dietTotal*100)+'%;background:var(--b);border-radius:2px;min-width:1px"></div></div><span style="font-size:9px;font-weight:600;width:20px;color:var(--b)">'+cov+'</span></div>';
+    });
+  }
+  html += '</div>';
 
   // Top reminders
   const reminderCompCounts = {};
