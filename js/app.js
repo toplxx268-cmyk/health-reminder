@@ -319,7 +319,8 @@ function renderTCM() {
   }
 
   // === RECOMMEND TAB ===
-  let tagHtml = '<div style="display:flex;flex-wrap:wrap;gap:6px">';
+  // build symptom tags inline
+  let tagHtml = '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">';
   const allEntries = [
     ...TCM_SYMPTOMS.map(s => ({id:s.id, nm:s.nm, em:s.catEm, isCustom:false})),
     ...Object.entries(tcmCustomMap).map(([id, nm]) => ({id, nm, em:'✏️', isCustom:true}))
@@ -335,16 +336,15 @@ function renderTCM() {
     tagHtml += '<button onclick="toggleSymptom(\''+s.id+'\')" style="display:inline-flex;align-items:center;padding:6px 10px;border-radius:20px;'+st+';font-size:13px;cursor:pointer;white-space:nowrap">'+s.em+' '+s.nm+(sel?' ✓':'')+delBtn+'</button>';
   });
   tagHtml += '</div>';
-  tagHtml += '<div style="display:flex;gap:6px;margin-top:8px"><input type="text" id="custom-symptom-input" placeholder="输入症状..." style="flex:1;padding:8px 12px;border-radius:20px;border:1.5px dashed var(--sep);font-size:13px;outline:none" onkeydown="if(event.key===\'Enter\')addCustomSymptom()"><button onclick="addCustomSymptom()" style="padding:8px 16px;border-radius:20px;border:none;background:var(--b);color:#fff;font-size:13px;cursor:pointer;white-space:nowrap">＋</button></div>';
-  document.getElementById('tcm-symptom-tags').innerHTML = tagHtml;
+  tagHtml += '<div style="display:flex;gap:6px;margin-bottom:12px"><input type="text" id="custom-symptom-input" placeholder="输入症状..." style="flex:1;padding:8px 12px;border-radius:20px;border:1.5px dashed var(--sep);font-size:13px;outline:none" onkeydown="if(event.key===\'Enter\')addCustomSymptom()"><button onclick="addCustomSymptom()" style="padding:8px 16px;border-radius:20px;border:none;background:var(--b);color:#fff;font-size:13px;cursor:pointer;white-space:nowrap">＋</button></div>';
 
   const recEl = document.getElementById('tcm-recommendations');
   if (tcmSelected.size === 0) {
-    recEl.innerHTML = tabBar + '<div class="card" style="text-align:center;color:var(--s);padding:24px">👆 点击上方症状标签<br>获取食疗·茶饮·穴位推荐</div>';
+    recEl.innerHTML = tabBar + tagHtml + '<div class="card" style="text-align:center;color:var(--s);padding:24px">👆 点击上方症状标签<br>获取食疗·茶饮·穴位推荐</div>';
     return;
   }
 
-  let html = tabBar;
+  let html = tabBar + tagHtml;
   const foods = {}; const teas = {}; const points = {}; const blends = {};
   const allKW = buildKeywordMap();
 
