@@ -290,21 +290,30 @@ function _isInterval(r) { return r.interval_minutes && r.interval_minutes > 0; }
 let tcmSelected = new Set();     // set of symptom IDs (preset ids + 'cust_N' keys)
 let tcmCustomMap = {};           // 'cust_N' → display name
 let tcmLogs = [];
+let tcmLogDate = new Date();     // date for wellness log view
 let tcmTab = 'recommend';        // 'recommend' | 'log'
 
 function renderSett() {
+  tcmLogDate = new Date(); // always start on today
   renderTCM();
 }
 
 function renderTCM() {
   loadTCMLogs();
 
-  // sub-tabs
-  let html = '<div style="display:flex;gap:8px;margin-bottom:12px"><button onclick="switchTCMTab(\'recommend\')" style="flex:1;padding:10px;border-radius:10px;border:none;font-size:14px;cursor:pointer;font-weight:600;background:'+(tcmTab==='recommend'?'var(--g)':'#E5E5EA')+';color:'+(tcmTab==='recommend'?'#fff':'var(--t)')+'">🩺 症状推荐</button><button onclick="switchTCMTab(\'log\')" style="flex:1;padding:10px;border-radius:10px;border:none;font-size:14px;cursor:pointer;font-weight:600;background:'+(tcmTab==='log'?'var(--g)':'#E5E5EA')+';color:'+(tcmTab==='log'?'#fff':'var(--t)')+'">📝 养生记录</button></div>';
+  // === sub-tabs at very top ===
+  const tabBar = '<div style="display:flex;gap:8px;margin-bottom:10px">'+
+    '<button onclick="switchTCMTab(\'recommend\')" style="flex:1;padding:10px;border-radius:10px;border:none;font-size:14px;cursor:pointer;font-weight:600;background:'+(tcmTab==='recommend'?'var(--g)':'#E5E5EA')+';color:'+(tcmTab==='recommend'?'#fff':'var(--t)')+'">🩺 症状推荐</button>'+
+    '<button onclick="switchTCMTab(\'log\')" style="flex:1;padding:10px;border-radius:10px;border:none;font-size:14px;cursor:pointer;font-weight:600;background:'+(tcmTab==='log'?'var(--g)':'#E5E5EA')+';color:'+(tcmTab==='log'?'#fff':'var(--t)')+'">📝 养生记录</button>'+
+    '</div>';
+
+  // hide symptom tags and guide buttons in log mode
+  document.getElementById('tcm-symptom-tags').style.display = tcmTab==='log' ? 'none' : '';
+  const gb = document.getElementById('tcm-guide-btns');
+  if (gb) gb.style.display = tcmTab==='log' ? 'none' : '';
 
   if (tcmTab === 'log') {
-    html += renderTCMLogTab();
-    document.getElementById('tcm-recommendations').innerHTML = html;
+    document.getElementById('tcm-recommendations').innerHTML = tabBar + renderTCMLogTab();
     return;
   }
 
@@ -319,19 +328,22 @@ function renderTCM() {
     const st = s.isCustom
       ? 'border:1.5px solid '+(sel?'var(--b)':'var(--sep)')+';background:'+(sel?'rgba(0,122,255,.1)':'#fff')+';color:'+(sel?'var(--b)':'var(--t)')
       : 'border:1.5px solid '+(sel?'var(--g)':'var(--sep)')+';background:'+(sel?'rgba(52,199,89,.12)':'#fff');
-    const delBtn = (sel || s.isCustom) ? '<button onclick="event.stopPropagation();removeSymptom(\''+s.id+'\')" style="padding:4px 7px;border-radius:0 20px 20px 0;border:1.5px solid var(--r);border-left:none;background:#fff;color:var(--r);font-size:11px;cursor:pointer;font-weight:700" title="移除">✕</button>' : '';
-    const radius = delBtn ? 'border-radius:20px 0 0 20px;' : 'border-radius:20px;';
-    tagHtml += '<span style="display:inline-flex;align-items:center">'+'<button onclick="toggleSymptom(\''+s.id+'\')" style="padding:6px 10px;'+radius+st+';font-size:13px;cursor:pointer;white-space:nowrap">'+s.em+' '+s.nm+(sel?' ✓':'')+'</button>'+delBtn+'</span>';
+    // cleaner inline × — subtle, inside the chip
+    const delBtn = (sel || s.isCustom)
+      ? '<span onclick="event.stopPropagation();removeSymptom(\''+s.id+'\')" style="display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;margin-left:2px;margin-right:-2px;border-radius:50%;background:rgba(0,0,0,.08);color:var(--s);font-size:10px;line-height:1;cursor:pointer;transition:all .15s" onmouseover="this.style.background=\'rgba(255,59,48,.15)\';this.style.color=\'var(--r)\'" onmouseout="this.style.background=\'rgba(0,0,0,.08)\';this.style.color=\'var(--s)\'">✕</span>'
+      : '';
+    tagHtml += '<button onclick="toggleSymptom(\''+s.id+'\')" style="display:inline-flex;align-items:center;padding:6px 10px;border-radius:20px;'+st+';font-size:13px;cursor:pointer;white-space:nowrap">'+s.em+' '+s.nm+(sel?' ✓':'')+delBtn+'</button>';
   });
   tagHtml += '<input type="text" id="custom-symptom-input" placeholder="输入症状..." style="width:100px;padding:6px 10px;border-radius:20px;border:1.5px dashed var(--sep);font-size:13px;outline:none" onkeydown="if(event.key===\'Enter\')addCustomSymptom()"><button onclick="addCustomSymptom()" style="padding:6px 10px;border-radius:20px;border:none;background:var(--b);color:#fff;font-size:12px;cursor:pointer">＋</button>';
   document.getElementById('tcm-symptom-tags').innerHTML = tagHtml;
 
   const recEl = document.getElementById('tcm-recommendations');
   if (tcmSelected.size === 0) {
-    recEl.innerHTML = html + '<div class="card" style="text-align:center;color:var(--s);padding:24px">👆 点击上方症状标签<br>获取食疗·茶饮·穴位推荐</div>';
+    recEl.innerHTML = tabBar + '<div class="card" style="text-align:center;color:var(--s);padding:24px">👆 点击上方症状标签<br>获取食疗·茶饮·穴位推荐</div>';
     return;
   }
 
+  let html = tabBar;
   const foods = {}; const teas = {}; const points = {}; const blends = {};
   const allKW = buildKeywordMap();
 
@@ -464,14 +476,29 @@ function addCustomSymptom() {
 
 // TCM Log Tab
 function renderTCMLogTab() {
-  const todayLogs = tcmLogs.filter(l => l.date === ts());
-  let h = '<div class="card" style="text-align:center;padding:12px;margin-bottom:12px"><span style="font-weight:600">'+new Date().toLocaleDateString('zh-CN',{year:'numeric',month:'long',day:'numeric',weekday:'long'})+'</span></div>';
+  const logDateStr = ts(tcmLogDate);
+  const todayStr = ts();
+  const isToday = logDateStr === todayStr;
+  const todayLogs = tcmLogs.filter(l => l.date === logDateStr);
+
+  const dateLabel = isToday ? '今天' : fmtDateCN(tcmLogDate);
+
+  let h = '';
+  // date navigator
+  h += '<div class="card" style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;margin-bottom:10px">';
+  h += '<button onclick="shiftTCMLogDate(-1)" style="background:none;border:none;font-size:20px;cursor:pointer;padding:4px 8px;color:var(--g)">‹</button>';
+  h += '<div style="text-align:center"><div style="font-weight:600;font-size:15px">'+dateLabel+'</div><div style="font-size:11px;color:var(--s)">'+logDateStr+'</div></div>';
+  h += '<button onclick="shiftTCMLogDate(1)" style="background:none;border:none;font-size:20px;cursor:pointer;padding:4px 8px;color:var(--g)"'+(isToday?' disabled style="opacity:.3"':'')+'>›</button>';
+  h += '</div>';
+  if (!isToday) {
+    h += '<button onclick="tcmLogDate=new Date();renderTCM()" style="display:block;margin:0 auto 10px;font-size:12px;color:var(--b);background:none;border:none;cursor:pointer">回到今天</button>';
+  }
 
   if (todayLogs.length === 0) {
-    h += '<div class="card" style="text-align:center;color:var(--s);padding:24px">今天还没有记录<br>点击下方按钮快速记录</div>';
+    h += '<div class="card" style="text-align:center;color:var(--s);padding:24px">'+(isToday?'今天还没有记录':'当天没有记录')+'<br>点击下方按钮快速记录</div>';
   } else {
     todayLogs.forEach(l => {
-      h += '<div class="tcm-item" style="display:flex;justify-content:space-between;align-items:center"><div><div style="font-weight:600;font-size:14px">'+(l.emoji||'✅')+' '+l.text+'</div><div style="font-size:11px;color:var(--s)">'+l.time+'</div></div><button onclick="deleteTCMLog(\''+l.id+'\')" style="background:none;border:none;color:var(--r);cursor:pointer;font-size:16px">✕</button></div>';
+      h += '<div class="tcm-item" style="display:flex;justify-content:space-between;align-items:center"><div><div style="font-weight:600;font-size:14px">'+(l.emoji||'✅')+' '+l.text+'</div><div style="font-size:11px;color:var(--s)">'+l.time+'</div></div><button onclick="deleteTCMLog(\''+l.id+'\')" style="background:none;border:none;color:var(--r);cursor:pointer;font-size:16px;opacity:.5">✕</button></div>';
     });
   }
 
@@ -483,13 +510,13 @@ function renderTCMLogTab() {
 
   h += '<div style="display:flex;gap:6px;margin-top:12px"><input type="text" id="tcm-log-input" placeholder="自定义记录..." style="flex:1;padding:8px 12px;border-radius:20px;border:1.5px dashed var(--sep);font-size:13px;outline:none" onkeydown="if(event.key===\'Enter\')addCustomTCMLog()"><button onclick="addCustomTCMLog()" style="padding:8px 14px;border-radius:20px;border:none;background:var(--g);color:#fff;font-size:13px;cursor:pointer">记录</button></div>';
 
-  const pastLogs = tcmLogs.filter(l => l.date !== ts()).sort((a,b) => b.date.localeCompare(a.date)).slice(0, 20);
+  const pastLogs = tcmLogs.filter(l => l.date !== logDateStr).sort((a,b) => b.date.localeCompare(a.date)).slice(0, 20);
   if (pastLogs.length > 0) {
     h += '<div class="st" style="margin-top:20px">历史记录</div>';
     let lastDate = '';
     pastLogs.forEach(l => {
       if (l.date !== lastDate) {
-        h += '<div style="font-size:12px;font-weight:600;color:var(--s);margin:8px 0 4px">'+l.date+'</div>';
+        h += '<div style="font-size:12px;font-weight:600;color:var(--s);margin:8px 0 4px;cursor:pointer" onclick="tcmLogDate=new Date(\''+l.date+'\');renderTCM()">'+l.date+'</div>';
         lastDate = l.date;
       }
       h += '<div style="font-size:13px;padding:4px 8px;color:var(--s)">'+(l.emoji||'✅')+' '+l.text+' <span style="font-size:10px">'+l.time+'</span></div>';
@@ -497,6 +524,24 @@ function renderTCMLogTab() {
   }
 
   return h;
+}
+
+function shiftTCMLogDate(n) {
+  tcmLogDate.setDate(tcmLogDate.getDate() + n);
+  // don't go past today
+  const today = new Date();
+  if (tcmLogDate > today) { tcmLogDate = new Date(today); return; }
+  renderTCM();
+}
+
+function fmtDateCN(d) {
+  const now = new Date();
+  if (d.toDateString() === now.toDateString()) return '今天';
+  const y = new Date(now); y.setDate(y.getDate()-1);
+  if (d.toDateString() === y.toDateString()) return '昨天';
+  const t = new Date(now); t.setDate(t.getDate()+1);
+  if (d.toDateString() === t.toDateString()) return '明天';
+  return (d.getMonth()+1)+'月'+d.getDate()+'日';
 }
 
 // TCM Log functions (localStorage)
@@ -507,14 +552,14 @@ function saveTCMLogs() {
   localStorage.setItem('tcm_logs', JSON.stringify(tcmLogs));
 }
 function addTCMLog(emoji, text) {
-  tcmLogs.push({id: Date.now().toString(), emoji, text, date: ts(), time: new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'})});
+  tcmLogs.push({id: Date.now().toString(), emoji, text, date: ts(tcmLogDate), time: new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'})});
   saveTCMLogs();
   renderTCM();
 }
 function addCustomTCMLog() {
   const inp = document.getElementById('tcm-log-input');
   if (!inp || !inp.value.trim()) return;
-  tcmLogs.push({id: Date.now().toString(), emoji: '✅', text: inp.value.trim(), date: ts(), time: new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'})});
+  tcmLogs.push({id: Date.now().toString(), emoji: '✅', text: inp.value.trim(), date: ts(tcmLogDate), time: new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'})});
   saveTCMLogs();
   renderTCM();
 }
