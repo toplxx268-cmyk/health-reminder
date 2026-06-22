@@ -1230,13 +1230,13 @@ async function saveMeal() {
   if (_editingMealId) {
     await supabase.from('meal_entries').update({
       meal_type: logMealType,
-      food_groups: Array.from(logGroups),
+      food_groups: expandFoodGroups(Array.from(logGroups)),
       notes: logNotes,
     }).eq('id', _editingMealId);
   } else {
     await supabase.from('meal_entries').insert({
       meal_type: logMealType, date: ts(dietDate), time: new Date().toISOString(),
-      food_groups: Array.from(logGroups), notes: logNotes,
+      food_groups: expandFoodGroups(Array.from(logGroups)), notes: logNotes,
     });
   }
   _editingMealId = null;
@@ -1624,6 +1624,33 @@ const FG = {
 };
 const FG_ALL = Object.keys(FG);
 
+// Cross-diet food group expansion: when a key is logged, auto-include equivalents for other diets
+const FOOD_GROUP_EXPAND = {
+  // Vegetable family: general ↔ specific
+  'vegetables':  ['leafyGreens','rootVeg','mindVeg','mindGreens'],
+  'leafyGreens': ['vegetables','mindGreens'],
+  'rootVeg':     ['vegetables'],
+  'mindVeg':     ['vegetables'],
+  'mindGreens':  ['vegetables','leafyGreens'],
+  // Fruit family
+  'fruits':      ['berries','mindBerries'],
+  'berries':     ['fruits','mindBerries'],
+  'mindBerries': ['fruits','berries'],
+  // Poultry/Egg family
+  'poultryEggs': ['eggs','poultry','mindPoultry'],
+  'eggs':        ['poultryEggs'],
+  'poultry':     ['poultryEggs','mindPoultry'],
+  'mindPoultry': ['poultryEggs','poultry'],
+};
+function expandFoodGroups(groups) {
+  const result = new Set(groups);
+  for (const g of groups) {
+    const exp = FOOD_GROUP_EXPAND[g];
+    if (exp) exp.forEach(e => result.add(e));
+  }
+  return Array.from(result);
+}
+
 // Diet frameworks — each maps to the 9 FG categories
 const DIETS = {
 	  modern: {
@@ -1754,26 +1781,18 @@ const FOOD_KW = {
 };
 
 function classifyFood(text) {
-  // Parse text, match keywords, return array of FG keys
-  const found = new Set();
-  const t = text.toLowerCase();
-  // match longest keywords first
-  const sorted = Object.entries(FOOD_KW).sort((a,b) => b[0].length - a[0].length);
-  for (const [kw, fg] of sorted) {
-    if (t.includes(kw) && !found.has(fg)) {
-      found.add(fg);
-      // also add parent category for MODERN-specific keys
-      if (fg==='leafyGreens'||fg==='rootVeg') found.add('vegetables');
-      if (fg==='berries') found.add('fruits');
-      if (fg==='eggs'||fg==='poultry') found.add('poultryEggs');
-    }
-  }
-	  // Also add MIND-specific equivalents for cross-diet tracking
-	  if (found.has('leafyGreens')) found.add('mindGreens');
-	  if (found.has('vegetables')) found.add('mindVeg');
-	  if (found.has('berries')) found.add('mindBerries');
-	  if (found.has('poultry')) found.add('mindPoultry');
-	  return Array.from(found);
+	  // Parse text, match keywords, return FG keys expanded for cross-diet coverage
+	  const found = new Set();
+	  const t = text.toLowerCase();
+	  // match longest keywords first
+	  const sorted = Object.entries(FOOD_KW).sort((a,b) => b[0].length - a[0].length);
+	  for (const [kw, fg] of sorted) {
+	    if (t.includes(kw) && !found.has(fg)) {
+	      found.add(fg);
+	    }
+	  }
+	  // expand to cross-diet equivalents
+	  return expandFoodGroups(Array.from(found));
 }
 
 const MT = {
