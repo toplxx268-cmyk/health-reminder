@@ -409,9 +409,11 @@ function renderTCM() {
 
   if (hasCustom) {
     if (!allCached && tcmAIKey) {
-      html += '<button onclick="callTCMAI()" id="tcm-ai-btn" style="display:block;width:100%;padding:12px;margin-bottom:12px;border-radius:12px;border:1.5px dashed var(--p);background:rgba(175,82,222,.04);color:var(--p);font-size:14px;font-weight:600;cursor:pointer"'+(tcmAILoading?' disabled':'')+'>'+(tcmAILoading?'⏳ AI分析中...':'🤖 AI 智能推荐')+'</button>';
+      html += '<div style="display:flex;gap:6px;margin-bottom:12px"><button onclick="callTCMAI()" id="tcm-ai-btn" style="flex:1;padding:12px;border-radius:12px;border:1.5px dashed var(--p);background:rgba(175,82,222,.04);color:var(--p);font-size:14px;font-weight:600;cursor:pointer"'+(tcmAILoading?' disabled':'')+'>'+(tcmAILoading?'⏳ AI分析中...':'🤖 AI 智能推荐')+'</button><button onclick="resetAIKey()" style="padding:12px 10px;border-radius:12px;border:1px solid var(--sep);background:#fff;color:var(--s);font-size:11px;cursor:pointer;white-space:nowrap" title="重置API配置">⚙️</button></div>';
     } else if (!tcmAIKey) {
       html += '<button onclick="showAIKeyPrompt()" style="display:block;width:100%;padding:12px;margin-bottom:12px;border-radius:12px;border:1.5px dashed var(--sep);background:#F9F9F9;color:var(--s);font-size:14px;cursor:pointer">🤖 AI 智能推荐 <span style="font-size:11px;opacity:.7">（需配置API Key）</span></button>';
+    } else if (allCached) {
+      html += '<button onclick="resetAIKey()" style="display:block;width:100%;padding:6px;margin-bottom:10px;border-radius:8px;border:none;background:none;color:var(--s);font-size:11px;cursor:pointer;opacity:.5">⚙️ 重置AI配置</button>';
     }
   }
 
@@ -577,6 +579,18 @@ function refreshAI() {
   customNames.forEach(n => { delete tcmAI[n]; });
   try { localStorage.setItem('tcm_ai', JSON.stringify(tcmAI)); } catch(e) {}
   if (tcmAIKey) { callTCMAI(); } else { renderTCM(); }
+}
+function resetAIKey() {
+  const msg = '当前 Key: '+(tcmAIKey ? tcmAIKey.slice(0,8)+'...' : '未设置')+'\n\n选择操作：';
+  if (confirm(msg+'\n点「确定」清除API配置，点「取消」返回')) {
+    tcmAIKey = '';
+    tcmAI = {};
+    localStorage.removeItem('tcm_aikey');
+    localStorage.removeItem('tcm_aiendpoint');
+    localStorage.removeItem('tcm_ai');
+    showToast('✅ API配置已清除，请重新输入');
+    renderTCM();
+  }
 }
 
 // Enhanced tokenizer for custom symptoms: breaks into characters + 2-char substrings
