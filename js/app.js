@@ -335,16 +335,17 @@ function renderTCM() {
   loadTCMLogs();
 
   // === sub-tabs at very top ===
-  const tabBar = '<div style="display:flex;gap:8px;margin-bottom:10px">'+
+  const tabBar = '<div style="display:flex;gap:8px">'+
     '<button onclick="switchTCMTab(\'recommend\')" style="flex:1;padding:10px;border-radius:10px;border:none;font-size:14px;cursor:pointer;font-weight:600;background:'+(tcmTab==='recommend'?'var(--g)':'#E5E5EA')+';color:'+(tcmTab==='recommend'?'#fff':'var(--t)')+'">🩺 症状推荐</button>'+
     '<button onclick="switchTCMTab(\'log\')" style="flex:1;padding:10px;border-radius:10px;border:none;font-size:14px;cursor:pointer;font-weight:600;background:'+(tcmTab==='log'?'var(--g)':'#E5E5EA')+';color:'+(tcmTab==='log'?'#fff':'var(--t)')+'">📝 养生记录</button>'+
     '</div>';
+  document.getElementById('tcm-tab-bar').innerHTML = tabBar;
 
   // hide symptom tags (and inline AI bar) in log mode
   document.getElementById('tcm-symptom-tags').style.display = tcmTab==='log' ? 'none' : '';
 
   if (tcmTab === 'log') {
-    document.getElementById('tcm-recommendations').innerHTML = tabBar + renderTCMLogTab();
+    document.getElementById('tcm-recommendations').innerHTML = renderTCMLogTab();
     return;
   }
 
@@ -373,11 +374,11 @@ function renderTCM() {
 
   const recEl = document.getElementById('tcm-recommendations');
   if (tcmSelected.size === 0) {
-    recEl.innerHTML = tabBar + '<div class="card" style="text-align:center;color:var(--s);padding:24px">👆 点击上方症状标签<br>获取食疗·茶饮·穴位推荐</div>';
+    recEl.innerHTML = '<div class="card" style="text-align:center;color:var(--s);padding:24px">👆 点击上方症状标签<br>获取食疗·茶饮·穴位推荐</div>';
     return;
   }
 
-  let html = tabBar;
+  let html = '';
   const foods = {}; const teas = {}; const points = {}; const blends = {};
   const allKW = buildKeywordMap();
 
@@ -1445,8 +1446,18 @@ async function renderStats() {
 
 function renderStatContent() {
   const now = new Date();
-  const minDate = ts(statMode==='week'?(()=>{let d=new Date(now);d.setDate(d.getDate()-d.getDay()-14);return d;})():new Date(statDate.getFullYear(),statMode==='month'?statDate.getMonth():0,1));
-  const maxDate = ts(statMode==='week'?now:new Date(statDate.getFullYear(),statMode==='month'?statDate.getMonth()+1:12,0));
+  // Use same date range as loadHistoricalData
+  let minDate, maxDate, ref2 = new Date(statDate);
+  if (statMode==='week') {
+    const dow = ref2.getDay(); ref2.setDate(ref2.getDate()-dow);
+    minDate = ts(ref2); ref2.setDate(ref2.getDate()+6); maxDate = ts(ref2);
+  } else if (statMode==='month') {
+    minDate = ts(new Date(statDate.getFullYear(),statDate.getMonth(),1));
+    maxDate = ts(new Date(statDate.getFullYear(),statDate.getMonth()+1,0));
+  } else {
+    minDate = ts(new Date(statDate.getFullYear(),0,1));
+    maxDate = ts(new Date(statDate.getFullYear(),11,31));
+  }
   const comps = allCompletions.filter(c => c.date >= minDate && c.date <= maxDate);
   const mealsData = allMeals.filter(m => m.date >= minDate && m.date <= maxDate);
 
