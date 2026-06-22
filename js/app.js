@@ -979,7 +979,7 @@ function renderEditForm() {
       const tgtDate = r.video_link && r.video_link.startsWith('date:') ? r.video_link.slice(5) : '';
       h += `<div class="frm"><label>📅 目标日期</label><input type="date" value="${tgtDate}" onchange="editing._targetDate=this.value"><div class="hint">设置后在任务旁显示倒数天数</div></div>`;
     }
-    +`<div class="frm"><label>重复间隔</label><select onchange="editing.interval_minutes=this.value?parseInt(this.value):null">
+    h += `<div class="frm"><label>重复间隔</label><select onchange="editing.interval_minutes=this.value?parseInt(this.value):null">
       <option value="" ${!r.interval_minutes?'selected':''}>不重复</option>
       <option value="30" ${r.interval_minutes===30?'selected':''}>30 分钟</option>
       <option value="45" ${r.interval_minutes===45?'selected':''}>45 分钟</option>
@@ -1008,7 +1008,7 @@ function renderEditForm() {
       }
       h += '<div class="hint">跨天重复的提醒每天自动重置完成状态</div></div>';
     }
-    +`<div class="frm"><label>提醒内容</label><textarea onchange="editing.message=this.value" rows="2">${r.message||''}</textarea></div>`;
+    h += `<div class="frm"><label>提醒内容</label><textarea onchange="editing.message=this.value" rows="2">${r.message||''}</textarea></div>`;
 
   if (baseType(r.type)==='exercise') {
     h += `<div class="frm"><label>🏃 跟练视频链接</label><input type="url" placeholder="YouTube / Bilibili 链接" value="${r.video_link||''}" onchange="editing.video_link=this.value"><div class="hint">保存后仪表盘可一键打开视频</div></div>`;
@@ -1418,6 +1418,7 @@ async function loadHistoricalData() {
 function switchStat(mode) {
   statMode = mode;
   statSelectedDate = null;
+  statDate = new Date(); // reset to today when switching modes
   ['week','month','year'].forEach(m => {
     const btn = document.getElementById('stat-'+m+'-btn');
     if (btn) { btn.style.background = mode===m?'var(--g)':'#F9F9F9'; btn.style.color = mode===m?'#fff':'var(--t)'; }
