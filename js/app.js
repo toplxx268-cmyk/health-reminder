@@ -525,35 +525,29 @@ async function callTCMAI() {
   const btn = document.getElementById('tcm-ai-btn');
   if (btn) { btn.textContent = '⏳ AI分析中...'; btn.disabled = true; }
 
-  const endpoint = localStorage.getItem('tcm_aiendpoint') || 'https://api.groq.com/openai/v1/chat/completions';
-  const model = endpoint.includes('groq') ? 'llama-3.3-70b-versatile' : 'gpt-4o-mini';
+  const apiEndpoint = localStorage.getItem('tcm_aiendpoint') || 'https://api.groq.com/openai/v1/chat/completions';
+  const model = apiEndpoint.includes('groq') ? 'llama-3.3-70b-versatile' : 'gpt-4o-mini';
+  const symptomText = uncached.join('、');
 
-  const prompt = `你是中医养生专家。请针对以下症状给出中医分析及推荐。严格按JSON格式输出，不要markdown代码块：
-{
-  "analysis": "中医辨证分析（150字内，说明症状所属证型、病位、病机，给出调理原则）",
-  "foods": [{"food":"食物名","nature":"性味","action":"功效","note":"用法"}],
-  "teas": [{"key":"拼音","name":"茶名","nature":"性味","effects":["功效"],"caution":"注意"}],
-  "points": [{"point":"穴位名","meridian":"经络","loc":"位置","tech":"手法"}]
-}
-症状：${uncached.join('、')}`;
+  // Use Supabase Edge Function as proxy (bypasses mobile Safari CORS restrictions)
+  const proxyUrl = SUPABASE_URL + '/functions/v1/tcm-ai';
 
   try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 30000);
-    const res = await fetch(endpoint, {
+    const timer = setTimeout(() => controller.abort(), 45000);
+    const res = await fetch(proxyUrl, {
       method: 'POST',
-      mode: 'cors',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tcmAIKey },
-      body: JSON.stringify({ model, messages: [{role:'user',content:prompt}], max_tokens: 2048, temperature: 0.7 }),
+      headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY },
+      body: JSON.stringify({ symptom: symptomText, apiKey: tcmAIKey, endpoint: apiEndpoint, model }),
       signal: controller.signal
     });
     clearTimeout(timer);
     if (!res.ok) {
-      const errText = await res.text().catch(() => '');
-      throw new Error('HTTP '+res.status+(errText?' — '+errText.slice(0,80):''));
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || ('HTTP '+res.status));
     }
-    const data = await res.json();
-    let text = data.choices?.[0]?.message?.content || '';
+    const result = await res.json();
+    let text = result.text || '';
     if (!text) throw new Error('API 返回为空，请检查 Key 是否正确');
     // strip markdown fences
     text = text.replace(/```json\n?/gi, '').replace(/```\n?/g, '').trim();
@@ -578,10 +572,10 @@ async function callTCMAI() {
     renderTCM();
   } catch(e) {
     let msg = e.message || '未知错误';
-    if (msg === 'Failed to fetch' || msg.includes('NetworkError')) {
-      msg = '网络不通 — 手机端请检查：\n① 关闭 Safari 的「阻止跨站跟踪」\n② 切换 WiFi 试试\n③ 检查 Key 是否正确';
-    } else if (msg.includes('abort') || msg.includes('AbortError')) {
+    if (msg.includes('abort') || msg.includes('AbortError')) {
       msg = '请求超时，请检查网络后重试';
+    } else if (msg === 'Failed to fetch' || msg.includes('NetworkError')) {
+      msg = '网络不通，请检查网络连接';
     }
     showToast('❌ ' + msg);
     console.error('TCM AI error:', e);
