@@ -1615,6 +1615,12 @@ const FG = {
   rootVeg:     {em:'🥕', nm:'根茎类(土豆)', fq:'≤0.75 份/天', ds:'土豆为主，胡萝卜山药适量。', ex:['土豆','胡萝卜','红薯','山药']},
   eggs:        {em:'🥚', nm:'鸡蛋', fq:'每天 0.5–1 个', ds:'水煮蛋或水波蛋最佳。', ex:['鸡蛋','鹌鹑蛋']},
   poultry:     {em:'🐔', nm:'禽肉', fq:'每天 ≤0.5 份', ds:'鸡胸肉，去皮蒸煮。', ex:['鸡胸肉','火鸡肉']},
+  // MIND细分
+  mindGreens:  {em:'🥬', nm:'深绿色蔬菜', fq:'每周≥6份', ds:'菠菜、羽衣甘蓝、芥菜、西蓝花等，每份约250克（半斤）', ex:['菠菜','羽衣甘蓝','芥菜','西蓝花','小白菜','空心菜']},
+  mindVeg:     {em:'🥕', nm:'其他蔬菜', fq:'每天≥1份', ds:'番茄、胡萝卜、茄子、洋葱等', ex:['番茄','胡萝卜','茄子','洋葱','黄瓜']},
+  mindBerries: {em:'🍓', nm:'浆果', fq:'每周≥2次', ds:'蓝莓、草莓、黑莓、桑葚等，富含花青素和维生素C', ex:['蓝莓','草莓','黑莓','桑葚','树莓']},
+  mindPoultry: {em:'🐔', nm:'家禽', fq:'每周2次', ds:'鸡肉、鸭肉，非油炸食用，比红肉更有益健康', ex:['鸡胸肉','鸭肉','火鸡肉']},
+  wine:        {em:'🍷', nm:'葡萄酒', fq:'每天≤1杯', ds:'非必需项，适量饮用红酒有益心血管', ex:['红酒','葡萄酒']},
 };
 const FG_ALL = Object.keys(FG);
 
@@ -1656,10 +1662,22 @@ const DIETS = {
     },
   },
   mind: {
-    name:'MIND饮食', em:'🧠', desc:'健脑15类，延缓认知退化',
-    daily: ['vegetables','fruits','wholeGrains'],
-    weekly: ['legumes','nuts','oliveOil','fish','poultryEggs'],
-    limited: ['sweets','dairy'],
+    name:'MIND饮食', em:'🧠', desc:'健脑10类，延缓认知退化',
+    daily: ['mindVeg','oliveOil','wholeGrains'],
+    weekly: ['mindGreens','mindBerries','nuts','fish','legumes','mindPoultry'],
+    limited: ['wine'],
+    fq: {
+      mindVeg: '每天 ≥1 份',
+      oliveOil: '每天 25–30 毫升',
+      wholeGrains: '每天 ≥3 份',
+      mindGreens: '每周 ≥6 份 · 每份约250g',
+      mindBerries: '每周 ≥2 次',
+      nuts: '每周 ≥5 份 · 每份约20g',
+      fish: '每周 ≥1 次 · 富含Omega-3',
+      legumes: '每周 ≥4 份',
+      mindPoultry: '每周 2 次 · 非油炸',
+      wine: '每天 ≤1 杯 · 非必需',
+    },
   },
 };
 // Extra limited items not in 9 categories
@@ -1733,6 +1751,8 @@ const FOOD_KW = {
   '蛋糕':'sweets','糖果':'sweets','含糖饮料':'sweets','冰淇淋':'sweets','甜食':'sweets',
   '饼干':'sweets','巧克力':'sweets','甜点':'sweets','奶茶':'sweets','汽水':'sweets','可乐':'sweets',
   '果汁饮料':'sweets','果酱':'sweets',
+	  // 葡萄酒
+	  '红酒':'wine','葡萄酒':'wine','干红':'wine','干白':'wine',
 };
 
 function classifyFood(text) {
@@ -1750,7 +1770,12 @@ function classifyFood(text) {
       if (fg==='eggs'||fg==='poultry') found.add('poultryEggs');
     }
   }
-  return Array.from(found);
+	  // Also add MIND-specific equivalents for cross-diet tracking
+	  if (found.has('leafyGreens')) found.add('mindGreens');
+	  if (found.has('vegetables')) found.add('mindVeg');
+	  if (found.has('berries')) found.add('mindBerries');
+	  if (found.has('poultry')) found.add('mindPoultry');
+	  return Array.from(found);
 }
 
 const MT = {
