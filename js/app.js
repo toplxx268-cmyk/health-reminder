@@ -286,9 +286,125 @@ function _isBlock(r) { return baseType(r.type)==='writing' || (r.active_hours_en
 function _isInterval(r) { return r.interval_minutes && r.interval_minutes > 0; }
 
 // ─── Settings ───
+// ─── TCM Wellness ───
+let tcmSelected = new Set();
+
 function renderSett() {
-  // Settings now only contains reference guides (static HTML)
-  // All edit/delete/new operations are on the dashboard
+  renderTCM();
+}
+
+function renderTCM() {
+  // Symptom tags
+  const tagEl = document.getElementById('tcm-symptom-tags');
+  if (!tagEl) return;
+  tagEl.innerHTML = TCM_SYMPTOMS.map(s => {
+    const sel = tcmSelected.has(s.id);
+    return `<button onclick="toggleSymptom('${s.id}')" style="padding:6px 12px;border-radius:20px;border:1.5px solid ${sel?'var(--g)':'var(--sep)'};background:${sel?'rgba(52,199,89,.12)':'#fff'};font-size:13px;cursor:pointer;white-space:nowrap">${s.catEm} ${s.nm}</button>`;
+  }).join('');
+
+  // Recommendations
+  const recEl = document.getElementById('tcm-recommendations');
+  if (tcmSelected.size === 0) {
+    recEl.innerHTML = '<div class="card" style="text-align:center;color:var(--s);padding:24px">👆 点击上方症状标签<br>获取食疗·茶饮·穴位推荐</div>';
+    return;
+  }
+
+  let html = '';
+  // Collect recommendations across selected symptoms
+  const foods = {}; const teas = {}; const points = {};
+  tcmSelected.forEach(sid => {
+    const sym = TCM_SYMPTOMS.find(s => s.id === sid);
+    if (!sym) return;
+    // Food therapy
+    if (TCM_FOODS[sid]) {
+      TCM_FOODS[sid].forEach(f => {
+        if (!foods[f.food]) foods[f.food] = { ...f, symptoms: [sym.nm] };
+        else if (!foods[f.food].symptoms.includes(sym.nm)) foods[f.food].symptoms.push(sym.nm);
+      });
+    }
+    // Teas (match by effects keywords to symptoms)
+    TEAS.forEach(t => {
+      const match = t.effects.some(e => sym.desc.includes(e.slice(0,2)) || t.suitableFor.includes(sym.nm.slice(0,2)));
+      if (match && !teas[t.key]) teas[t.key] = { ...t, matchSymptom: sym.nm };
+    });
+    // Acupoints
+    if (TCM_POINTS[sid]) {
+      TCM_POINTS[sid].forEach(p => {
+        if (!points[p.point]) points[p.point] = { ...p, symptoms: [sym.nm] };
+        else if (!points[p.point].symptoms.includes(sym.nm)) points[p.point].symptoms.push(sym.nm);
+      });
+    }
+  });
+
+  // Also match teas by symptom category
+  tcmSelected.forEach(sid => {
+    const sym = TCM_SYMPTOMS.find(s => s.id === sid);
+    if (!sym) return;
+    TEAS.forEach(t => {
+      const desc = t.suitableFor + t.description + t.effects.join('');
+      const kwMap = {
+        fatigue: ['疲劳','乏力','提神','精力'],
+        insomnia: ['失眠','安神','睡眠'],
+        poorDigestion: ['消化','胃','消食','健脾'],
+        constipation: ['便秘','润肠','通便'],
+        bloating: ['胀','气','消食'],
+        coldHands: ['寒','暖','温'],
+        acne: ['清热','解毒','火','痘'],
+        dryMouth: ['生津','润','口干'],
+        headache: ['头痛','头','清利'],
+        eyeStrain: ['眼','明目','目'],
+        anxiety: ['安神','舒缓','情绪','抑郁'],
+        weightGain: ['减肥','脂','消食'],
+        cold: ['感冒','寒','风热'],
+        menstrual: ['调经','活血','经'],
+        hairLoss: ['乌发','发','肾'],
+        skinDry: ['润','皮肤','燥'],
+      };
+      const kws = kwMap[sid] || [];
+      if (kws.some(kw => desc.includes(kw)) && !teas[t.key]) {
+        teas[t.key] = { ...t, matchSymptom: sym.nm };
+      }
+    });
+  });
+
+  // === Food Therapy ===
+  html += '<div class="st">🥗 中医食疗推荐</div>';
+  if (Object.keys(foods).length === 0) {
+    html += '<div class="card" style="color:var(--s);text-align:center">暂无匹配的食疗方案</div>';
+  } else {
+    Object.values(foods).slice(0, 8).forEach(f => {
+      html += `<div class="tcm-item"><div class="tcm-food">🌿 ${f.food} <span style="font-size:11px;background:rgba(0,0,0,.06);padding:1px 6px;border-radius:10px;margin-left:6px">性${f.nature}</span></div><div style="font-size:13px;color:var(--g);font-weight:500;margin-bottom:2px">${f.action}</div><div style="font-size:12px;color:var(--s)">${f.note}</div></div>`;
+    });
+  }
+
+  // === Tea ===
+  html += '<div class="st">🍵 茶饮推荐</div>';
+  const teaList = Object.values(teas).slice(0, 6);
+  if (teaList.length === 0) {
+    html += '<div class="card" style="color:var(--s);text-align:center">暂无匹配茶饮</div>';
+  } else {
+    teaList.forEach(t => {
+      html += `<div class="tcm-item"><div class="tcm-food">🍵 ${t.name} <span style="font-size:11px;background:rgba(0,0,0,.06);padding:1px 6px;border-radius:10px;margin-left:6px">性${t.nature}</span></div><div style="font-size:12px;color:var(--s)">${t.effects.slice(0,4).join('·')}</div><div style="font-size:12px;color:var(--o);margin-top:2px">⚠️ ${t.caution}</div></div>`;
+    });
+  }
+
+  // === Acupressure ===
+  html += '<div class="st">💆 穴位按摩 · 经络推拿</div>';
+  if (Object.keys(points).length === 0) {
+    html += '<div class="card" style="color:var(--s);text-align:center">暂无匹配穴位</div>';
+  } else {
+    Object.values(points).slice(0, 6).forEach(p => {
+      html += `<div class="tcm-item"><div class="tcm-food">📍 ${p.point} <span style="font-size:10px;color:var(--s);margin-left:4px">${p.meridian}</span></div><div style="font-size:12px;color:var(--s);margin-bottom:4px">位置：${p.loc}</div><div style="font-size:12px;color:var(--g)">手法：${p.tech}</div></div>`;
+    });
+  }
+
+  recEl.innerHTML = html;
+}
+
+function toggleSymptom(id) {
+  if (tcmSelected.has(id)) tcmSelected.delete(id);
+  else tcmSelected.add(id);
+  renderTCM();
 }
 
 function renderSettGroup(elId, items) {
@@ -1039,6 +1155,234 @@ const TEAS = [
   {key:'mulberry',name:'桑葚茶',englishName:'Mulberry Tea',nature:'寒',taste:'甘',meridians:'肝、肾',effects:['滋阴补血','生津润燥','乌发明目','抗衰老'],description:'富含花青素、铁、维生素。滋阴补血、生津润燥。',suitableFor:'阴虚血少、须发早白、眼干目涩者',caution:'脾胃虚寒、腹泻者不宜；糖尿病患者注意'},
   {key:'hibiscus',name:'洛神花茶',englishName:'Hibiscus Tea',nature:'凉',taste:'酸',meridians:'肺、胃',effects:['生津止渴','降血压','清热解暑','促进消化','美容养颜'],description:'汤色红宝石，酸甜口感。富含维生素C和花青素。',suitableFor:'高血压、夏季暑热、食欲不振者',caution:'胃酸过多者不宜空腹；孕妇慎用'},
 ];
+
+// ─── Data: TCM Symptom-Recommendation Engine ───
+const TCM_SYMPTOMS = [
+  {id:'fatigue',nm:'疲劳乏力',cat:'虚证',desc:'精神不振、容易疲倦',catEm:'😴'},
+  {id:'insomnia',nm:'失眠多梦',cat:'虚证',desc:'入睡困难、多梦易醒',catEm:'😴'},
+  {id:'poorDigestion',nm:'消化不良',cat:'脾胃',desc:'饭后腹胀、食欲不振',catEm:'🫄'},
+  {id:'constipation',nm:'便秘',cat:'脾胃',desc:'排便困难、大便干燥',catEm:'🫄'},
+  {id:'bloating',nm:'腹胀',cat:'脾胃',desc:'腹部胀满、嗳气',catEm:'🫄'},
+  {id:'coldHands',nm:'手脚冰凉',cat:'虚证',desc:'四肢不温、怕冷畏寒',catEm:'🥶'},
+  {id:'acne',nm:'长痘',cat:'热证',desc:'面部痤疮、皮肤出油',catEm:'🔥'},
+  {id:'dryMouth',nm:'口干舌燥',cat:'热证',desc:'口渴多饮、咽喉干燥',catEm:'🔥'},
+  {id:'headache',nm:'头痛',cat:'经络',desc:'头部胀痛或刺痛',catEm:'🤕'},
+  {id:'eyeStrain',nm:'眼干眼疲劳',cat:'经络',desc:'用眼过度、视物模糊',catEm:'👁️'},
+  {id:'neckPain',nm:'肩颈酸痛',cat:'经络',desc:'颈肩僵硬、活动受限',catEm:'💆'},
+  {id:'backPain',nm:'腰背酸痛',cat:'经络',desc:'腰膝酸软、久坐不适',catEm:'💆'},
+  {id:'anxiety',nm:'焦虑烦躁',cat:'情志',desc:'情绪不稳、心烦易怒',catEm:'😤'},
+  {id:'weightGain',nm:'体重增加',cat:'代谢',desc:'代谢缓慢、容易发胖',catEm:'⚖️'},
+  {id:'cold',nm:'感冒初期',cat:'外感',desc:'鼻塞流涕、怕风怕冷',catEm:'🤧'},
+  {id:'menstrual',nm:'痛经',cat:'妇科',desc:'经期腹痛、经行不畅',catEm:'🌹'},
+  {id:'hairLoss',nm:'脱发',cat:'虚证',desc:'发质干枯、脱发增多',catEm:'💇'},
+  {id:'skinDry',nm:'皮肤干燥',cat:'虚证',desc:'皮肤粗糙、干裂脱屑',catEm:'🧴'},
+];
+
+// TCM Food Therapy: symptom → recommended foods
+const TCM_FOODS = {
+  fatigue:[
+    {food:'黄芪',nature:'温',action:'补气升阳',note:'炖汤或泡水，每天5-10g。常配党参、枸杞。'},
+    {food:'山药',nature:'平',action:'补脾益气',note:'蒸食或煮粥。搭配红枣效果更佳。'},
+    {food:'红枣',nature:'温',action:'补血安神',note:'每日3-5颗泡水或煮粥。搭配桂圆养心血。'},
+    {food:'党参',nature:'平',action:'补中益气',note:'炖鸡汤或排骨汤。常与黄芪同用。'},
+    {food:'黑芝麻',nature:'平',action:'滋补肝肾',note:'炒熟磨粉每日1勺。搭配核桃养脑。'},
+  ],
+  insomnia:[
+    {food:'酸枣仁',nature:'平',action:'养心安神',note:'睡前半小时煮水喝。打碎后效果更好。'},
+    {food:'桂圆',nature:'温',action:'补益心脾',note:'配红枣泡茶。每日5-8颗，不宜过量。'},
+    {food:'莲子',nature:'平',action:'养心安神',note:'去心煮粥或煲汤。配百合安神效果佳。'},
+    {food:'百合',nature:'微寒',action:'清心安神',note:'煮粥或炖银耳。适合心烦失眠者。'},
+    {food:'牛奶',nature:'平',action:'安神助眠',note:'睡前温热饮用。加蜂蜜效果更好。'},
+  ],
+  poorDigestion:[
+    {food:'山楂',nature:'微温',action:'消食化积',note:'饭后泡水或当零食。胃酸过多者适量。'},
+    {food:'陈皮',nature:'温',action:'理气健脾',note:'泡茶或入菜。越陈越佳，理气不伤正。'},
+    {food:'麦芽',nature:'平',action:'消食和中',note:'炒麦芽泡水。善消米面积滞。'},
+    {food:'鸡内金',nature:'平',action:'健胃消食',note:'研粉冲服每次2-3g。消食力强。'},
+    {food:'白萝卜',nature:'凉',action:'下气消食',note:'生吃或煮汤。冬天萝卜赛人参。'},
+  ],
+  constipation:[
+    {food:'决明子',nature:'微寒',action:'润肠通便',note:'炒熟泡茶饮。每次10-15g。'},
+    {food:'蜂蜜',nature:'平',action:'润肠通便',note:'晨起温水冲服一勺。水温不宜过烫。'},
+    {food:'黑芝麻',nature:'平',action:'润肠通便',note:'炒熟磨粉拌蜂蜜。富含油脂润肠。'},
+    {food:'香蕉',nature:'寒',action:'润肠通便',note:'熟透香蕉效果佳。脾胃虚寒者适量。'},
+    {food:'火龙果',nature:'凉',action:'清热通便',note:'富含膳食纤维。红心效果更佳。'},
+  ],
+  bloating:[
+    {food:'陈皮',nature:'温',action:'理气消胀',note:'泡茶或入菜。配生姜温中行气。'},
+    {food:'白萝卜',nature:'凉',action:'下气消胀',note:'煮水加蜂蜜。通气不伤胃。'},
+    {food:'砂仁',nature:'温',action:'行气化湿',note:'研末冲服每次1-3g。孕妇慎用。'},
+    {food:'佛手',nature:'温',action:'疏肝理气',note:'切片泡茶饮。香气怡人理气佳。'},
+  ],
+  coldHands:[
+    {food:'生姜',nature:'温',action:'温中散寒',note:'煮水加红糖。早上喝效果最好。'},
+    {food:'当归',nature:'温',action:'补血温经',note:'炖羊肉或鸡汤。经期前一周食用。'},
+    {food:'羊肉',nature:'温',action:'温阳补虚',note:'冬季炖汤。配当归生姜效果佳。'},
+    {food:'肉桂',nature:'大热',action:'温阳散寒',note:'炖肉时加入少许。阴虚火旺者忌。'},
+    {food:'核桃',nature:'温',action:'温补肾阳',note:'每日2-3个。配黑芝麻补肾暖身。'},
+  ],
+  acne:[
+    {food:'绿豆',nature:'寒',action:'清热解毒',note:'煮汤或粥。夏天消暑解毒必备。'},
+    {food:'薏苡仁',nature:'微寒',action:'清热排脓',note:'煮粥或泡水。配赤小豆祛痘。'},
+    {food:'苦瓜',nature:'寒',action:'清热泻火',note:'凉拌或炒食。清心火效果好。'},
+    {food:'金银花',nature:'寒',action:'清热解毒',note:'泡茶饮用。善清上焦风热。'},
+    {food:'菊花',nature:'微寒',action:'清肝明目',note:'泡茶饮。配枸杞护眼清肝。'},
+  ],
+  dryMouth:[
+    {food:'梨',nature:'凉',action:'生津润燥',note:'生吃或炖冰糖。秋天润燥首选。'},
+    {food:'银耳',nature:'平',action:'滋阴润肺',note:'炖羹加冰糖。长期食用皮肤润泽。'},
+    {food:'麦冬',nature:'微寒',action:'养阴生津',note:'泡水或煲汤。善清肺胃之热。'},
+    {food:'甘蔗',nature:'寒',action:'清热生津',note:'榨汁饮用。解渴生津良品。'},
+  ],
+  headache:[
+    {food:'菊花',nature:'微寒',action:'清利头目',note:'泡茶。配薄荷疏散风热。'},
+    {food:'天麻',nature:'平',action:'平肝息风',note:'炖鱼头汤。偏头痛调理佳品。'},
+    {food:'川芎',nature:'温',action:'活血行气',note:'炖汤少量（3-5g）。血虚头痛适用。'},
+  ],
+  eyeStrain:[
+    {food:'枸杞',nature:'平',action:'滋补肝肾',note:'每日10-15粒泡水或嚼食。明目首选。'},
+    {food:'菊花',nature:'微寒',action:'清肝明目',note:'配枸杞泡茶。一清一补护眼佳。'},
+    {food:'决明子',nature:'微寒',action:'清肝明目',note:'炒熟泡茶。眼干眼涩常用。'},
+    {food:'蓝莓',nature:'凉',action:'养肝明目',note:'每日一小把。花青素护眼。'},
+  ],
+  neckPain:[
+    {food:'葛根',nature:'凉',action:'解肌舒筋',note:'煮水或炖汤。缓解颈项强痛。'},
+    {food:'桑枝',nature:'平',action:'祛风通络',note:'煮水外洗或泡脚。疏通上肢经络。'},
+    {food:'黑豆',nature:'平',action:'补肾强筋',note:'煮汤或醋泡。肾主骨生髓。'},
+  ],
+  backPain:[
+    {food:'杜仲',nature:'温',action:'补肾强腰',note:'炖猪腰或排骨。腰痛要药。'},
+    {food:'核桃',nature:'温',action:'补肾强筋',note:'每日2-3个。配黑芝麻效果佳。'},
+    {food:'牛膝',nature:'平',action:'补肾强筋',note:'少量炖汤。引药下行强腰膝。'},
+  ],
+  anxiety:[
+    {food:'玫瑰花',nature:'温',action:'疏肝解郁',note:'泡茶饮。香气怡人舒缓情绪。'},
+    {food:'合欢花',nature:'平',action:'解郁安神',note:'泡茶或煮粥。烦闷不乐时饮用。'},
+    {food:'百合',nature:'微寒',action:'清心安神',note:'煮粥。心烦不眠时食用。'},
+    {food:'香蕉',nature:'寒',action:'缓解焦虑',note:'含色氨酸有助情绪稳定。'},
+  ],
+  weightGain:[
+    {food:'薏苡仁',nature:'微寒',action:'健脾利湿',note:'煮粥配赤小豆。久服轻身。'},
+    {food:'冬瓜',nature:'微寒',action:'利水消肿',note:'煮汤加少量盐。低热量高纤维。'},
+    {food:'荷叶',nature:'平',action:'升清降脂',note:'泡茶或煮粥。降脂减肥常用。'},
+    {food:'山楂',nature:'微温',action:'消食降脂',note:'泡水饭后饮用。消肉食积滞。'},
+  ],
+  cold:[
+    {food:'生姜',nature:'温',action:'发汗解表',note:'煮红糖水趁热喝。风寒感冒初期最佳。'},
+    {food:'葱白',nature:'温',action:'发汗解表',note:'配生姜煮水。通阳散寒。'},
+    {food:'紫苏',nature:'温',action:'解表散寒',note:'煮水或入菜。行气宽中和胃。'},
+    {food:'大蒜',nature:'温',action:'解毒防感',note:'切碎生食或做菜。增强免疫力。'},
+  ],
+  menstrual:[
+    {food:'当归',nature:'温',action:'活血调经',note:'炖汤经前一周食用。妇科圣药。'},
+    {food:'红糖',nature:'温',action:'温经止痛',note:'配生姜热水冲服。经期腹痛即饮。'},
+    {food:'益母草',nature:'微寒',action:'活血调经',note:'煮水经前饮用。孕妇忌用。'},
+    {food:'艾叶',nature:'温',action:'温经止血',note:'煮水泡脚或煮鸡蛋。暖宫散寒。'},
+  ],
+  hairLoss:[
+    {food:'何首乌',nature:'温',action:'补肝肾乌发',note:'制首乌炖汤。生首乌慎用需炮制。'},
+    {food:'黑芝麻',nature:'平',action:'补肝肾润发',note:'每日一勺磨粉。配核桃养发。'},
+    {food:'桑葚',nature:'寒',action:'滋阴补血',note:'鲜食或泡茶。补血养发。'},
+  ],
+  skinDry:[
+    {food:'银耳',nature:'平',action:'滋阴润肤',note:'炖羹长期食用。植物胶原蛋白。'},
+    {food:'蜂蜜',nature:'平',action:'润燥养肤',note:'温水冲服或敷面。内外兼用。'},
+    {food:'杏仁',nature:'温',action:'润肺养肤',note:'甜杏仁每日5-10粒。肺主皮毛。'},
+    {food:'猪蹄',nature:'平',action:'滋阴润燥',note:'炖汤。富含胶原蛋白。'},
+  ],
+};
+
+// TCM Acupressure Points: symptom → recommended points
+const TCM_POINTS = {
+  fatigue:[
+    {point:'足三里',loc:'小腿外侧，膝下3寸，胫骨前嵴外一横指',tech:'拇指按压3-5分钟，有酸胀感为度。每日早晚各一次。',meridian:'足阳明胃经'},
+    {point:'关元',loc:'肚脐下3寸（四横指）',tech:'手掌顺时针按揉5分钟。补元气要穴。',meridian:'任脉'},
+    {point:'气海',loc:'肚脐下1.5寸（两横指）',tech:'温和按揉或艾灸10分钟。',meridian:'任脉'},
+  ],
+  insomnia:[
+    {point:'神门',loc:'手腕横纹尺侧端，尺侧腕屈肌腱桡侧凹陷处',tech:'拇指按揉3分钟，睡前操作。安神定志。',meridian:'手少阴心经'},
+    {point:'安眠',loc:'耳后翳风与风池连线中点',tech:'中指按揉2-3分钟。经外奇穴专治失眠。',meridian:'经外奇穴'},
+    {point:'三阴交',loc:'内踝尖上3寸，胫骨内侧缘后方',tech:'拇指按揉5分钟。调补肝脾肾。',meridian:'足太阴脾经'},
+  ],
+  poorDigestion:[
+    {point:'足三里',loc:'小腿外侧，膝下3寸',tech:'拇指按压3-5分钟。调理脾胃第一要穴。',meridian:'足阳明胃经'},
+    {point:'中脘',loc:'肚脐上4寸（五横指）',tech:'手掌顺时针按揉5分钟。胃之募穴。',meridian:'任脉'},
+    {point:'内关',loc:'手腕横纹上2寸，两筋之间',tech:'拇指按揉3分钟，止呕消胀。',meridian:'手厥阴心包经'},
+  ],
+  constipation:[
+    {point:'天枢',loc:'肚脐旁开2寸（三横指）',tech:'双手拇指同时按压两侧，顺时针揉3分钟。',meridian:'足阳明胃经'},
+    {point:'支沟',loc:'手背腕横纹上3寸，尺桡骨之间',tech:'拇指按压有酸胀感。通便要穴。',meridian:'手少阳三焦经'},
+  ],
+  bloating:[
+    {point:'中脘',loc:'肚脐上4寸',tech:'手掌顺时针揉腹5分钟。行气消胀。',meridian:'任脉'},
+    {point:'足三里',loc:'膝下3寸',tech:'按压或艾灸10分钟。健脾行气。',meridian:'足阳明胃经'},
+    {point:'太冲',loc:'足背第1、2跖骨间凹陷处',tech:'从太冲向行间方向推按。疏肝理气。',meridian:'足厥阴肝经'},
+  ],
+  coldHands:[
+    {point:'涌泉',loc:'足底前1/3凹陷处',tech:'每晚热水泡脚后搓揉100次。温补肾阳。',meridian:'足少阴肾经'},
+    {point:'命门',loc:'腰部后正中线上，第2腰椎棘突下',tech:'手掌搓热后敷按或艾灸。温阳要穴。',meridian:'督脉'},
+    {point:'关元',loc:'肚脐下3寸',tech:'艾灸或手掌按揉。培补元气暖全身。',meridian:'任脉'},
+  ],
+  acne:[
+    {point:'合谷',loc:'手背第1、2掌骨间，第二掌骨桡侧中点',tech:'拇指按压3分钟。清头面风热。',meridian:'手阳明大肠经'},
+    {point:'曲池',loc:'肘横纹外侧端，屈肘时肘弯尽头',tech:'拇指按压3分钟。清热利湿。',meridian:'手阳明大肠经'},
+    {point:'大椎',loc:'第7颈椎棘突下凹陷',tech:'刮痧或按压。清热泻火。',meridian:'督脉'},
+  ],
+  dryMouth:[
+    {point:'太溪',loc:'内踝尖与跟腱之间凹陷处',tech:'拇指按揉3分钟。滋阴补肾。',meridian:'足少阴肾经'},
+    {point:'照海',loc:'内踝尖下方凹陷处',tech:'按揉2-3分钟。滋阴润燥利咽。',meridian:'足少阴肾经'},
+  ],
+  headache:[
+    {point:'太阳',loc:'眉梢与外眼角之间向后1横指凹陷处',tech:'双手拇指同时按揉3分钟。偏正头痛皆宜。',meridian:'经外奇穴'},
+    {point:'风池',loc:'枕骨下，胸锁乳突肌与斜方肌之间凹陷',tech:'拇指按揉有酸胀感向后脑放射。',meridian:'足少阳胆经'},
+    {point:'合谷',loc:'手背虎口处',tech:'强刺激按压。头面诸疾皆可用。',meridian:'手阳明大肠经'},
+  ],
+  eyeStrain:[
+    {point:'睛明',loc:'目内眦角稍上方凹陷处',tech:'食指轻按，闭目放松1分钟。',meridian:'足太阳膀胱经'},
+    {point:'攒竹',loc:'眉头凹陷处',tech:'大拇指按揉。缓解眼疲劳立效。',meridian:'足太阳膀胱经'},
+    {point:'光明',loc:'外踝尖上5寸，腓骨前缘',tech:'按揉3分钟。胆经络穴通于肝目。',meridian:'足少阳胆经'},
+  ],
+  neckPain:[
+    {point:'风池',loc:'枕骨下凹陷处',tech:'拇指按揉或拿捏5分钟。松解颈部肌肉。',meridian:'足少阳胆经'},
+    {point:'肩井',loc:'大椎与肩峰连线中点',tech:'拇指按压或拿捏。孕妇禁用。',meridian:'足少阳胆经'},
+    {point:'后溪',loc:'握拳时掌横纹尽头处',tech:'滚揉或掐按。通督脉治颈项强痛。',meridian:'手太阳小肠经'},
+  ],
+  backPain:[
+    {point:'肾俞',loc:'腰部第2腰椎棘突下旁开1.5寸',tech:'双手叉腰拇指按压或搓揉。补肾强腰。',meridian:'足太阳膀胱经'},
+    {point:'委中',loc:'膝盖后方腘横纹中点',tech:'拇指按压或拍打。腰背委中求。',meridian:'足太阳膀胱经'},
+    {point:'命门',loc:'腰部正中第2腰椎棘突下',tech:'手掌搓热敷按。温肾阳强腰脊。',meridian:'督脉'},
+  ],
+  anxiety:[
+    {point:'太冲',loc:'足背第1、2跖骨间',tech:'从太冲向行间推按。疏肝理气解郁。',meridian:'足厥阴肝经'},
+    {point:'内关',loc:'腕横纹上2寸',tech:'拇指按揉3分钟。宁心安神。',meridian:'手厥阴心包经'},
+    {point:'膻中',loc:'两乳头连线中点（胸骨正中）',tech:'手掌顺时针轻揉。宽胸理气。',meridian:'任脉'},
+  ],
+  weightGain:[
+    {point:'丰隆',loc:'外踝尖上8寸，胫骨前嵴外两横指',tech:'拇指按压有强烈酸胀感。化痰要穴。',meridian:'足阳明胃经'},
+    {point:'阴陵泉',loc:'小腿内侧，胫骨内侧髁后下方凹陷',tech:'按揉5分钟。健脾利湿。',meridian:'足太阴脾经'},
+    {point:'天枢',loc:'肚脐旁开2寸',tech:'按揉或艾灸。调理肠胃。',meridian:'足阳明胃经'},
+  ],
+  cold:[
+    {point:'风池',loc:'枕骨下凹陷',tech:'拇指按揉至局部发热。祛风解表。',meridian:'足少阳胆经'},
+    {point:'大椎',loc:'第7颈椎棘突下',tech:'艾灸或搓热。振奋阳气驱寒。',meridian:'督脉'},
+    {point:'合谷',loc:'虎口处',tech:'按压至酸胀。解表退热。',meridian:'手阳明大肠经'},
+  ],
+  menstrual:[
+    {point:'三阴交',loc:'内踝尖上3寸',tech:'按揉或艾灸10分钟。调经要穴。',meridian:'足太阴脾经'},
+    {point:'关元',loc:'肚脐下3寸',tech:'艾灸或热敷。暖宫散寒。',meridian:'任脉'},
+    {point:'血海',loc:'髌骨内侧上2寸，股内侧肌隆起处',tech:'拇指按揉3分钟。活血调经。',meridian:'足太阴脾经'},
+  ],
+  hairLoss:[
+    {point:'百会',loc:'头顶正中，两耳尖连线中点',tech:'手指轻叩或按揉。升提阳气。',meridian:'督脉'},
+    {point:'肾俞',loc:'腰部第2腰椎旁开1.5寸',tech:'搓揉至局部发热。肾其华在发。',meridian:'足太阳膀胱经'},
+    {point:'风池',loc:'枕骨下',tech:'按揉至头皮发热。促进头部血液循环。',meridian:'足少阳胆经'},
+  ],
+  skinDry:[
+    {point:'太溪',loc:'内踝尖与跟腱之间',tech:'按揉3分钟。滋阴润燥。',meridian:'足少阴肾经'},
+    {point:'三阴交',loc:'内踝尖上3寸',tech:'按揉5分钟。调理三阴经。',meridian:'足太阴脾经'},
+    {point:'肺俞',loc:'第3胸椎棘突下旁开1.5寸',tech:'按揉或艾灸。肺主皮毛。',meridian:'足太阳膀胱经'},
+  ],
+};
 
 // ─── Notifications ───
 let notifiedKeys = new Set(); // track already-fired keys for today (date-rid-hh:mm)

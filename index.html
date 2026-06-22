@@ -137,6 +137,10 @@
     .tea-card{background:var(--card);border-radius:14px;padding:14px;margin-bottom:10px}
     .tea-card .n{font-size:17px;font-weight:600;margin-bottom:2px}
 
+    /* TCM items */
+    .tcm-item{background:var(--card);border-radius:12px;padding:12px 14px;margin-bottom:8px}
+    .tcm-item .tcm-food{font-size:15px;font-weight:600;margin-bottom:4px}
+
     @keyframes up{from{transform:translateY(100%)}to{transform:translateY(0)}}
   </style>
 </head>
@@ -195,11 +199,23 @@
     <div id="dash-content"></div>
   </div>
 
-  <!-- ===== SETTINGS ===== -->
+  <!-- ===== TCM 中医养生 ===== -->
   <div id="pane-settings" class="pane">
-    <div class="st">参考指南</div>
-    <button class="fab" style="background:var(--card);color:var(--t);box-shadow:0 1px 3px rgba(0,0,0,.04);margin-bottom:8px" onclick="showTeaGuide()">🍵 18种中医茶饮功效</button>
-    <button class="fab" style="background:var(--card);color:var(--t);box-shadow:0 1px 3px rgba(0,0,0,.04);margin-bottom:8px" onclick="showMedGuide()">🥗 地中海饮食指南</button>
+    <div class="card" style="background:linear-gradient(135deg,#8B4513,#A0522D);color:#fff;text-align:center;padding:20px;margin-bottom:12px">
+      <div style="font-size:40px;margin-bottom:4px">🌿</div>
+      <div style="font-size:20px;font-weight:700">中医养生</div>
+      <div style="font-size:12px;opacity:.8">食疗 · 茶饮 · 穴位 · 经络推拿</div>
+    </div>
+
+    <div class="st">🩺 选择你的症状</div>
+    <div id="tcm-symptom-tags" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px"></div>
+
+    <div id="tcm-recommendations"></div>
+
+    <div style="margin-top:20px">
+      <button class="fab" style="background:var(--card);color:var(--t);box-shadow:0 1px 3px rgba(0,0,0,.04);margin-bottom:8px" onclick="showTeaGuide()">🍵 18种茶饮详情</button>
+      <button class="fab" style="background:var(--card);color:var(--t);box-shadow:0 1px 3px rgba(0,0,0,.04);margin-bottom:8px" onclick="showMedGuide()">🥗 地中海饮食指南</button>
+    </div>
   </div>
 
   <!-- ===== STATS ===== -->
