@@ -1200,31 +1200,46 @@ function renderLogForm() {
 function setMT(k) { logMealType = k; renderLogForm(); }
 function togFG(k) { if (logGroups.has(k)) logGroups.delete(k); else logGroups.add(k); renderLogForm(); }
 
-function aiClassify() {
-  const input = document.getElementById('ai-food-input');
-  const result = document.getElementById('ai-result');
-  if (!input || !input.value.trim()) { result.textContent = '请输入食物描述'; return; }
-  const matched = classifyFood(input.value);
-  if (matched.length === 0) {
-    result.innerHTML = '<span style="color:var(--o)">未识别到食物，请手动选择下方分类</span>';
-    return;
-  }
-  // auto-select matched groups + fill notes with input text
-  matched.forEach(k => logGroups.add(k));
-  logNotes = input.value;
-  renderLogForm();
-  // show result summary
-  const names = matched.map(k => FG[k].em + FG[k].nm).join('、');
-  result.innerHTML = `<span style="color:var(--g)">✅ 识别到：${names}</span>`;
-  // restore input value + notes after re-render
-  setTimeout(() => {
-    const inp = document.getElementById('ai-food-input');
-    if (inp) inp.value = input.value;
-    const ta = document.querySelector('#meal-body textarea');
-    if (ta) ta.value = logNotes;
-  }, 50);
+function classifyMealType(text) {
+	  // Detect meal type from text keywords
+	  const t = text.toLowerCase();
+	  if (/早餐|早饭|早上|早晨|早点|清晨/.test(t)) return 'breakfast';
+	  if (/午餐|午饭|中午|午间|中饭/.test(t)) return 'lunch';
+	  if (/晚餐|晚饭|晚上|晚间|夜里/.test(t)) return 'dinner';
+	  if (/加餐|零食|下午茶|宵夜|夜宵|点心|小吃|零嘴/.test(t)) return 'snack';
+	  return null; // no meal type detected, keep current selection
 }
 
+function aiClassify() {
+	  const input = document.getElementById('ai-food-input');
+	  const result = document.getElementById('ai-result');
+	  if (!input || !input.value.trim()) { result.textContent = '请输入食物描述'; return; }
+	  const text = input.value;
+	  // Detect meal type
+	  const detectedMT = classifyMealType(text);
+	  if (detectedMT) logMealType = detectedMT;
+	  // Classify food groups
+	  const matched = classifyFood(text);
+	  if (matched.length === 0) {
+	    result.innerHTML = '<span style="color:var(--o)">未识别到食物，请手动选择下方分类</span>';
+	    return;
+	  }
+	  // auto-select matched groups + fill notes with input text
+	  matched.forEach(k => logGroups.add(k));
+	  logNotes = text;
+	  renderLogForm();
+	  // show result summary with meal type
+	  const mtInfo = detectedMT ? (MT[detectedMT]||{}).em+' '+(MT[detectedMT]||{}).nm+' · ' : '';
+	  const names = matched.map(k => FG[k].em + FG[k].nm).join('、');
+	  result.innerHTML = `<span style="color:var(--g)">✅ ${mtInfo}识别到：${names}</span>`;
+	  // restore input value + notes after re-render
+	  setTimeout(() => {
+	    const inp = document.getElementById('ai-food-input');
+	    if (inp) inp.value = text;
+	    const ta = document.querySelector('#meal-body textarea');
+	    if (ta) ta.value = logNotes;
+	  }, 50);
+}
 async function saveMeal() {
   if (logGroups.size===0) return;
   if (_editingMealId) {
