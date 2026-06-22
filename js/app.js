@@ -1076,7 +1076,7 @@ function renderDiet() {
   const diet = DIETS[dietMode];
   const daily = diet.daily; const weekly = diet.weekly; const limited = diet.limited;
   const cc = daily.filter(t => covered.has(t)).length;
-  const vegCount = FG_VEG.filter(k => covered.has(k) && daily.includes(k)).length;
+  const vegCount = covered.has('vegetables') ? 1 : 0;
   const pct = cc / daily.length;
   const ringP = 2*Math.PI*15.5;
 
@@ -1095,7 +1095,7 @@ function renderDiet() {
   h += '</div>';
 
   // progress
-  h += `<div class="card" style="display:flex;align-items:center;gap:16px"><div class="ring" style="width:64px;height:64px"><svg viewBox="0 0 36 36" width="64" height="64"><circle class="ring-bg" cx="18" cy="18" r="15.5"/><circle class="ring-fg" cx="18" cy="18" r="15.5" stroke-dasharray="${ringP}" stroke-dashoffset="${ringP*(1-pct)}"/></svg><div class="ring-t" style="font-size:14px">${Math.round(pct*100)}%</div></div><div style="flex:1"><div style="font-weight:600">${diet.em} ${diet.name}</div><div style="font-size:13px;color:var(--s)">已覆盖 ${cc}/${daily.length} 类 · 蔬菜 ${vegCount}/5 种</div><div style="font-size:11px;color:var(--s);margin-top:2px">${diet.desc}</div></div></div>`;
+  h += `<div class="card" style="display:flex;align-items:center;gap:16px"><div class="ring" style="width:64px;height:64px"><svg viewBox="0 0 36 36" width="64" height="64"><circle class="ring-bg" cx="18" cy="18" r="15.5"/><circle class="ring-fg" cx="18" cy="18" r="15.5" stroke-dasharray="${ringP}" stroke-dashoffset="${ringP*(1-pct)}"/></svg><div class="ring-t" style="font-size:14px">${Math.round(pct*100)}%</div></div><div style="flex:1"><div style="font-weight:600">${diet.em} ${diet.name}</div><div style="font-size:13px;color:var(--s)">已覆盖 ${cc}/${daily.length} 类 · 蔬菜 ${vegCount ? "✅" : "⭕"}</div><div style="font-size:11px;color:var(--s);margin-top:2px">${diet.desc}</div></div></div>`;
 
   const dfq = diet.fq || {}; // custom frequency labels
   // daily checklist — 3 per row
@@ -1467,7 +1467,7 @@ function renderStatContent() {
   const dailyCompCount = {}; comps.forEach(c => { dailyCompCount[c.date] = (dailyCompCount[c.date]||0)+1; });
   const dailyDietCov = {}; mealsData.forEach(m => {
     if (!dailyDietCov[m.date]) dailyDietCov[m.date] = new Set();
-    (m.food_groups||[]).forEach(g => { if (FG_DAILY.includes(g)) dailyDietCov[m.date].add(g); });
+    (m.food_groups||[]).forEach(g => { if (FG_ALL.includes(g)) dailyDietCov[m.date].add(g); });
   });
 
   // Calendar or week strip
@@ -1541,7 +1541,7 @@ function renderStatContent() {
     // completions
     html += '<div style="margin-bottom:6px"><span style="font-weight:500">✅ 打卡：</span>'+(dayComps.length>0?dayComps.map(c=>{const r=reminders.find(x=>x.id===c.reminder_id);return emoji(r?r.type:'')+' '+(r?r.title:'');}).join(' · '):'<span style="color:var(--s)">无</span>')+'</div>';
     // diet
-    html += '<div style="margin-bottom:6px"><span style="font-weight:500">🥗 饮食覆盖数：</span>'+(dayCov.size>0?dayCov.size+'/'+FG_DAILY.length+' 类（'+[...dayCov].map(g=>FG[g]?FG[g].em+'':'').join(' ')+')':'<span style="color:var(--s)">无记录</span>')+'</div>';
+    html += '<div style="margin-bottom:6px"><span style="font-weight:500">🥗 饮食覆盖数：</span>'+(dayCov.size>0?dayCov.size+'/'+FG_ALL.length+' 类（'+[...dayCov].map(g=>FG[g]?FG[g].em+'':'').join(' ')+')':'<span style="color:var(--s)">无记录</span>')+'</div>';
     // tcm
     const tcmScoreParts = [];
     if (tcmDayScore.energy) tcmScoreParts.push('⚡'+tcmDayScore.energy);
@@ -1554,7 +1554,7 @@ function renderStatContent() {
   }
 
   // Summary cards
-  const dietTotal = FG_DAILY.length;
+  const dietTotal = FG_ALL.length;
   const totalDays = Math.max(1, (new Date(maxDate)-new Date(minDate))/86400000+1);
   const daysWithComps = new Set(comps.map(c=>c.date)).size;
   const totalComps = comps.length;
@@ -1598,104 +1598,84 @@ document.addEventListener('click', function(e) {
 
 
 // ─── Data: Food Groups ───
+// 9大类食物分类（严格按此表）
 const FG = {
-  // 蔬菜细分（每日必须，每餐占餐盘一半）
-  vegLeafy:     {em:'🥬', nm:'叶菜类', cat:'veg', fq:'每日', ds:'深色绿叶菜富含叶酸、铁、钙，每餐必备。', ex:['菠菜','生菜','油菜','茼蒿','小白菜','芝麻菜']},
-  vegCruciferous:{em:'🥦', nm:'十字花科', cat:'veg', fq:'每日', ds:'含硫代葡萄糖苷有助抗癌。清蒸或快炒最佳。', ex:['西兰花','花椰菜','卷心菜','羽衣甘蓝','芥蓝','抱子甘蓝']},
-  vegFruit:     {em:'🍅', nm:'果菜类', cat:'veg', fq:'每日', ds:'番茄富含番茄红素，烹饪后更易吸收。', ex:['番茄','彩椒','茄子','黄瓜','西葫芦','秋葵']},
-  vegRoot:      {em:'🥕', nm:'根茎类', cat:'veg', fq:'每日', ds:'富含β-胡萝卜素和膳食纤维。', ex:['胡萝卜','白萝卜','甜菜','红薯','山药','莲藕']},
-  vegAllium:    {em:'🧅', nm:'葱蒜类', cat:'veg', fq:'每日', ds:'含大蒜素有助抗炎、增强免疫。', ex:['洋葱','大蒜','韭菜','葱','蒜苗','红葱头']},
-  // 每日必须
-  fruits:       {em:'🍎', nm:'水果', cat:'daily', fq:'每日≥2份', ds:'餐后甜点最佳选择。新鲜水果优于果汁。', ex:['苹果','橙子','葡萄','石榴','无花果','莓果','梨']},
-  wholeGrains:  {em:'🌾', nm:'全谷物', cat:'daily', fq:'每日3-6份', ds:'提供持久能量和膳食纤维。', ex:['藜麦','燕麦','糙米','全麦面包','意面','荞麦']},
-  legumes:      {em:'🫘', nm:'豆类', cat:'daily', fq:'每日≥1份', ds:'优质植物蛋白，经济实惠。', ex:['鹰嘴豆','扁豆','蚕豆','白豆','小扁豆','毛豆']},
-  nuts:         {em:'🥜', nm:'坚果种子', cat:'daily', fq:'每日1小把', ds:'富含健康脂肪和微量元素。', ex:['杏仁','核桃','腰果','松子','芝麻','亚麻籽']},
-  oliveOil:     {em:'🫒', nm:'橄榄油', cat:'daily', fq:'主要脂肪', ds:'地中海饮食核心，特级初榨最佳。', ex:['特级初榨橄榄油']},
-  herbs:        {em:'🌿', nm:'香草香料', cat:'daily', fq:'替代盐', ds:'减少钠摄入，增添风味。', ex:['迷迭香','百里香','牛至','罗勒','大蒜','欧芹']},
-  // 每周适量
-  fish:         {em:'🐟', nm:'鱼虾海鲜', cat:'weekly', fq:'每周≥2次', ds:'富含Omega-3，深海鱼尤佳。', ex:['三文鱼','沙丁鱼','鳕鱼','虾','贻贝','鲭鱼']},
-  poultry:      {em:'🐔', nm:'禽肉', cat:'weekly', fq:'每周2-3次', ds:'白肉优于红肉，去皮烤蒸。', ex:['鸡胸肉','鸭肉','火鸡肉','鹌鹑']},
-  eggs:         {em:'🥚', nm:'鸡蛋', cat:'weekly', fq:'每周2-4个', ds:'优质蛋白，煮蛋或水波蛋最佳。', ex:['鸡蛋','鹌鹑蛋','鸭蛋']},
-  dairy:        {em:'🧀', nm:'乳制品', cat:'weekly', fq:'每日1-2份', ds:'优选发酵乳制品。', ex:['希腊酸奶','羊奶酪','帕玛森','开菲尔']},
-  // 限制
-  redMeat:      {em:'🥩', nm:'红肉', cat:'limited', fq:'每周≤1次', ds:'严格限制，每月几次而非每日。', ex:['牛肉','猪肉','羊肉','加工肉']},
-  sweets:       {em:'🍰', nm:'甜食', cat:'limited', fq:'尽量不吃', ds:'想吃甜食选新鲜水果替代。', ex:['蛋糕','糖果','含糖饮料','冰淇淋']},
+  vegetables:  {em:'🥬', nm:'蔬菜', fq:'每餐半盘', ds:'各色蔬菜，深色绿叶菜尤佳。', ex:['菠菜','生菜','西兰花','番茄','胡萝卜','洋葱','黄瓜','茄子','彩椒','大蒜']},
+  fruits:      {em:'🍎', nm:'水果', fq:'每天1-2份', ds:'浆果+柑橘优先，新鲜整果优于果汁。', ex:['蓝莓','草莓','苹果','橙子','葡萄','石榴']},
+  wholeGrains: {em:'🌾', nm:'全谷物', fq:'每天3-6份', ds:'燕麦、糙米、藜麦等，提供持久能量和纤维。', ex:['燕麦','糙米','藜麦','全麦面包','荞麦','小米']},
+  legumes:     {em:'🫘', nm:'豆类', fq:'每周2-3次', ds:'优质植物蛋白，鹰嘴豆、扁豆等。', ex:['鹰嘴豆','扁豆','黄豆','黑豆','毛豆','豆腐']},
+  nuts:        {em:'🥜', nm:'坚果种子', fq:'每天1小把', ds:'核桃、杏仁、亚麻籽，富含健康脂肪。', ex:['核桃','杏仁','腰果','亚麻籽','芝麻','南瓜籽']},
+  oliveOil:    {em:'🫒', nm:'橄榄油', fq:'每天1-4汤匙', ds:'特级初榨橄榄油，核心脂肪来源。', ex:['特级初榨橄榄油']},
+  fish:        {em:'🐟', nm:'鱼虾海鲜', fq:'每周≥2次', ds:'三文鱼、沙丁鱼等富含Omega-3。', ex:['三文鱼','沙丁鱼','鳕鱼','虾','贻贝']},
+  poultryEggs: {em:'🐔', nm:'禽肉蛋', fq:'每周2-3次', ds:'鸡胸肉、鸡蛋，去皮蒸煮最佳。', ex:['鸡胸肉','鸡蛋','鸭肉','鹌鹑蛋']},
+  dairy:       {em:'🧀', nm:'乳制品', fq:'适量', ds:'优选发酵乳制品，希腊酸奶等。', ex:['希腊酸奶','奶酪','牛奶','开菲尔']},
 };
-const FG_DAILY  = Object.keys(FG).filter(k => FG[k].cat === 'veg' || FG[k].cat === 'daily');  // 11 items
-const FG_WEEKLY = Object.keys(FG).filter(k => FG[k].cat === 'weekly'); // 4 items
-const FG_LIMIT  = Object.keys(FG).filter(k => FG[k].cat === 'limited'); // 2 items
-const FG_VEG    = Object.keys(FG).filter(k => FG[k].cat === 'veg');     // 5 vegetable sub-types
+const FG_ALL = Object.keys(FG); // 9 categories
 
-// Diet frameworks — each maps FG keys to diet-specific categories
+// Diet frameworks — each maps to the 9 FG categories
 const DIETS = {
   modern: {
     name:'MODERN饮食', em:'💪', desc:'必吃+适量+忌口，精准量化',
-    daily: ['oliveOil','vegLeafy','fruits'],        // 必吃+每天
-    weekly: ['eggs','poultry','vegRoot'],            // 适量3类
-    limited: ['sweets','redMeat','dairy'],
-    // Custom frequency overrides
+    daily: ['oliveOil','vegetables','fruits'],
+    weekly: ['poultryEggs'],
+    limited: ['sweets','dairy'],
     fq: {
       oliveOil:'每天 >10g · 必吃',
-      vegLeafy:'每天 1–1.5 份',
+      vegetables:'绿叶菜为主 每天 1–1.5 份',
       fruits:'浆果+柑橘 每天 1–2 份',
-      vegRoot:'土豆 ≤0.75 份/天',
-      eggs:'每天 0.5–1 个',
-      poultry:'每天 ≤0.5 份',
+      poultryEggs:'鸡蛋 0.5–1个/天 · 禽肉 ≤0.5份/天',
       sweets:'含糖饮料 · 完全不喝',
-      wholeGrains:'每天 3–5 份',
-      legumes:'适量',
-      nuts:'每天 1 小把',
-      fish:'每周 ≥2 次',
     },
   },
   med: {
     name:'地中海饮食', em:'🫒', desc:'每餐半盘蔬菜，每周≥2次海鲜',
-    daily: ['vegLeafy','vegCruciferous','vegFruit','vegRoot','vegAllium','fruits','wholeGrains','oliveOil','nuts'],
-    weekly: ['fish','legumes','poultry','eggs','dairy'],
-    limited: ['redMeat','sweets'],
+    daily: ['vegetables','fruits','wholeGrains','oliveOil','nuts'],
+    weekly: ['fish','legumes','poultryEggs','dairy'],
+    limited: ['sweets'],
     fq: {
-      vegLeafy:'每餐半盘', vegCruciferous:'每餐半盘', vegFruit:'每餐半盘', vegRoot:'每餐半盘', vegAllium:'每餐半盘',
+      vegetables:'每餐半盘',
       fruits:'每天 1–2 份',
       wholeGrains:'燕麦/糙米',
       oliveOil:'每天 1–4 汤匙',
       nuts:'每天 1 小把',
       fish:'每周 ≥2 次',
       legumes:'每周 2–3 次',
-      poultry:'每周 2–3 次',
-      eggs:'每周 2–3 次',
+      poultryEggs:'每周 2–3 次',
       dairy:'低脂奶制品',
     },
   },
   mind: {
-    name:'MIND饮食', em:'🧠', desc:'15类健脑食物，延缓认知退化',
-    daily: ['vegLeafy','vegCruciferous','vegFruit','vegRoot','vegAllium','fruits','wholeGrains'],
-    weekly: ['legumes','nuts','oliveOil','fish','poultry'],
-    limited: ['redMeat','sweets','dairy'],
+    name:'MIND饮食', em:'🧠', desc:'健脑15类，延缓认知退化',
+    daily: ['vegetables','fruits','wholeGrains'],
+    weekly: ['legumes','nuts','oliveOil','fish','poultryEggs'],
+    limited: ['sweets','dairy'],
   },
 };
+// Extra limited items not in 9 categories
+FG.sweets = {em:'🍰', nm:'甜食/含糖饮料', fq:'避免', ds:'用水果替代甜食，不喝含糖饮料。', ex:['蛋糕','糖果','汽水','奶茶']};
 let dietMode = 'modern'; // 'modern' | 'med' | 'mind'
 
 // ─── AI Food Classifier: keyword → FG key ───
 const FOOD_KW = {
   // 叶菜类
-  '菠菜':'vegLeafy','生菜':'vegLeafy','油菜':'vegLeafy','茼蒿':'vegLeafy','小白菜':'vegLeafy','芝麻菜':'vegLeafy',
-  '空心菜':'vegLeafy','苋菜':'vegLeafy','芥菜':'vegLeafy','娃娃菜':'vegLeafy','大白菜':'vegLeafy','卷心菜':'vegCruciferous',
-  '青菜':'vegLeafy','菜心':'vegLeafy','油麦菜':'vegLeafy','豌豆苗':'vegLeafy','芽苗菜':'vegLeafy','苦菊':'vegLeafy',
+  '菠菜':'vegetables','生菜':'vegetables','油菜':'vegetables','茼蒿':'vegetables','小白菜':'vegetables','芝麻菜':'vegetables',
+  '空心菜':'vegetables','苋菜':'vegetables','芥菜':'vegetables','娃娃菜':'vegetables','大白菜':'vegetables','卷心菜':'vegetables',
+  '青菜':'vegetables','菜心':'vegetables','油麦菜':'vegetables','豌豆苗':'vegetables','芽苗菜':'vegetables','苦菊':'vegetables',
   // 十字花科
-  '西兰花':'vegCruciferous','花椰菜':'vegCruciferous','西蓝花':'vegCruciferous','菜花':'vegCruciferous',
-  '卷心菜':'vegCruciferous','甘蓝':'vegCruciferous','羽衣甘蓝':'vegCruciferous','芥蓝':'vegCruciferous',
-  '抱子甘蓝':'vegCruciferous','白萝卜':'vegRoot','芜菁':'vegRoot','雪里蕻':'vegCruciferous',
+  '西兰花':'vegetables','花椰菜':'vegetables','西蓝花':'vegetables','菜花':'vegetables',
+  '卷心菜':'vegetables','甘蓝':'vegetables','羽衣甘蓝':'vegetables','芥蓝':'vegetables',
+  '抱子甘蓝':'vegetables','白萝卜':'vegetables','芜菁':'vegetables','雪里蕻':'vegetables',
   // 果菜类
-  '番茄':'vegFruit','西红柿':'vegFruit','彩椒':'vegFruit','柿子椒':'vegFruit','青椒':'vegFruit','甜椒':'vegFruit',
-  '茄子':'vegFruit','黄瓜':'vegFruit','西葫芦':'vegFruit','秋葵':'vegFruit','南瓜':'vegFruit',
-  '辣椒':'vegFruit','朝天椒':'vegFruit','丝瓜':'vegFruit','苦瓜':'vegFruit','冬瓜':'vegFruit',
+  '番茄':'vegetables','西红柿':'vegetables','彩椒':'vegetables','柿子椒':'vegetables','青椒':'vegetables','甜椒':'vegetables',
+  '茄子':'vegetables','黄瓜':'vegetables','西葫芦':'vegetables','秋葵':'vegetables','南瓜':'vegetables',
+  '辣椒':'vegetables','朝天椒':'vegetables','丝瓜':'vegetables','苦瓜':'vegetables','冬瓜':'vegetables',
   // 根茎类
-  '胡萝卜':'vegRoot','萝卜':'vegRoot','胡萝卜':'vegRoot','白萝卜':'vegRoot','甜菜':'vegRoot','红薯':'vegRoot',
-  '山药':'vegRoot','莲藕':'vegRoot','土豆':'vegRoot','马铃薯':'vegRoot','芋头':'vegRoot','莴笋':'vegRoot',
-  '竹笋':'vegRoot','芦笋':'vegRoot','茭白':'vegRoot','牛蒡':'vegRoot','紫薯':'vegRoot',
+  '胡萝卜':'vegetables','萝卜':'vegetables','胡萝卜':'vegetables','白萝卜':'vegetables','甜菜':'vegetables','红薯':'vegetables',
+  '山药':'vegetables','莲藕':'vegetables','土豆':'vegetables','马铃薯':'vegetables','芋头':'vegetables','莴笋':'vegetables',
+  '竹笋':'vegetables','芦笋':'vegetables','茭白':'vegetables','牛蒡':'vegetables','紫薯':'vegetables',
   // 葱蒜类
-  '洋葱':'vegAllium','大蒜':'vegAllium','蒜':'vegAllium','韭菜':'vegAllium','葱':'vegAllium','蒜苗':'vegAllium',
-  '红葱头':'vegAllium','大葱':'vegAllium','小葱':'vegAllium','蒜薹':'vegAllium','韭黄':'vegAllium',
+  '洋葱':'vegetables','大蒜':'vegetables','蒜':'vegetables','韭菜':'vegetables','葱':'vegetables','蒜苗':'vegetables',
+  '红葱头':'vegetables','大葱':'vegetables','小葱':'vegetables','蒜薹':'vegetables','韭黄':'vegetables',
   // 水果
   '苹果':'fruits','橙子':'fruits','橘子':'fruits','葡萄':'fruits','石榴':'fruits','无花果':'fruits',
   '莓果':'fruits','蓝莓':'fruits','草莓':'fruits','香蕉':'fruits','梨':'fruits','西瓜':'fruits',
@@ -1718,26 +1698,26 @@ const FOOD_KW = {
   // 橄榄油
   '橄榄油':'oliveOil','特级初榨':'oliveOil','初榨橄榄油':'oliveOil',
   // 香草香料
-  '迷迭香':'herbs','百里香':'herbs','牛至':'herbs','罗勒':'herbs','欧芹':'herbs',
-  '香料':'herbs','香草':'herbs','薄荷':'herbs','紫苏':'herbs','香菜':'herbs','茴香':'herbs',
-  '姜黄':'herbs','肉桂':'herbs','孜然':'herbs','丁香':'herbs',
+  '迷迭香':'vegetables','百里香':'vegetables','牛至':'vegetables','罗勒':'vegetables','欧芹':'vegetables',
+  '香料':'vegetables','香草':'vegetables','薄荷':'vegetables','紫苏':'vegetables','香菜':'vegetables','茴香':'vegetables',
+  '姜黄':'vegetables','肉桂':'vegetables','孜然':'vegetables','丁香':'vegetables',
   // 鱼虾海鲜
   '三文鱼':'fish','沙丁鱼':'fish','鳕鱼':'fish','虾':'fish','贻贝':'fish','鲭鱼':'fish',
   '鱼':'fish','海鲜':'fish','贝类':'fish','鲈鱼':'fish','带鱼':'fish','金枪鱼':'fish',
   '海鲈':'fish','青花鱼':'fish','秋刀鱼':'fish','牡蛎':'fish','蛤蜊':'fish','扇贝':'fish',
   '鱿鱼':'fish','章鱼':'fish','螃蟹':'fish','蟹':'fish','龙虾':'fish','鳗鱼':'fish',
   // 禽肉
-  '鸡肉':'poultry','鸡胸':'poultry','鸡腿':'poultry','鸭肉':'poultry','火鸡':'poultry','鹌鹑':'poultry',
-  '鸽子':'poultry','禽肉':'poultry','鸡':'poultry','鸭':'poultry',
+  '鸡肉':'poultryEggs','鸡胸':'poultryEggs','鸡腿':'poultryEggs','鸭肉':'poultryEggs','火鸡':'poultryEggs','鹌鹑':'poultryEggs',
+  '鸽子':'poultryEggs','禽肉':'poultryEggs','鸡':'poultryEggs','鸭':'poultryEggs',
   // 鸡蛋
-  '鸡蛋':'eggs','蛋':'eggs','鹌鹑蛋':'eggs','鸭蛋':'eggs','蛋黄':'eggs','蛋白':'eggs',
+  '鸡蛋':'poultryEggs','蛋':'poultryEggs','鹌鹑蛋':'poultryEggs','鸭蛋':'poultryEggs','蛋黄':'poultryEggs','蛋白':'poultryEggs',
   // 乳制品
   '酸奶':'dairy','希腊酸奶':'dairy','奶酪':'dairy','芝士':'dairy','羊奶酪':'dairy',
   '牛奶':'dairy','开菲尔':'dairy','乳制品':'dairy','奶':'dairy','黄油':'dairy','奶油':'dairy',
   // 红肉
-  '牛肉':'redMeat','猪肉':'redMeat','羊肉':'redMeat','红肉':'redMeat','加工肉':'redMeat',
-  '培根':'redMeat','火腿':'redMeat','香肠':'redMeat','腊肉':'redMeat','牛排':'redMeat',
-  '排骨':'redMeat',
+  '牛肉':'sweets','猪肉':'sweets','羊肉':'sweets','红肉':'sweets','加工肉':'sweets',
+  '培根':'sweets','火腿':'sweets','香肠':'sweets','腊肉':'sweets','牛排':'sweets',
+  '排骨':'sweets',
   // 甜食
   '蛋糕':'sweets','糖果':'sweets','含糖饮料':'sweets','冰淇淋':'sweets','甜食':'sweets',
   '饼干':'sweets','巧克力':'sweets','甜点':'sweets','奶茶':'sweets','汽水':'sweets','可乐':'sweets',
