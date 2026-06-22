@@ -1648,9 +1648,11 @@ function updateNotifBanner() {
 
 // ─── On load, check for existing session ───
 (async function init() {
-  // Register service worker for PWA
+  // Unregister all service workers to prevent stale cache
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/health-reminder/sw.js').catch(() => {});
+    navigator.serviceWorker.getRegistrations().then(regs => {
+      regs.forEach(r => r.unregister());
+    });
   }
   const { data: { session } } = await supabase.auth.getSession();
   if (session?.user) {
