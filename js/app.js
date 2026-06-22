@@ -1097,22 +1097,23 @@ function renderDiet() {
   // progress
   h += `<div class="card" style="display:flex;align-items:center;gap:16px"><div class="ring" style="width:64px;height:64px"><svg viewBox="0 0 36 36" width="64" height="64"><circle class="ring-bg" cx="18" cy="18" r="15.5"/><circle class="ring-fg" cx="18" cy="18" r="15.5" stroke-dasharray="${ringP}" stroke-dashoffset="${ringP*(1-pct)}"/></svg><div class="ring-t" style="font-size:14px">${Math.round(pct*100)}%</div></div><div style="flex:1"><div style="font-weight:600">${diet.em} ${diet.name}</div><div style="font-size:13px;color:var(--s)">已覆盖 ${cc}/${daily.length} 类 · 蔬菜 ${vegCount}/5 种</div><div style="font-size:11px;color:var(--s);margin-top:2px">${diet.desc}</div></div></div>`;
 
+  const dfq = diet.fq || {}; // custom frequency labels
   // daily checklist — 3 per row
-  h += `<div class="st">🥇 每日核心食物</div><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:12px">${daily.map(k=>{
-    const info = FG[k]; const ok = covered.has(k);
-    return `<div class="chk" style="flex-direction:column;align-items:center;gap:2px;padding:8px 6px;text-align:center"><div style="font-size:20px">${ok?'✅':'⭕'}</div><div class="nm" style="font-size:12px">${info.em} ${info.nm}</div><div class="fq" style="font-size:10px">${info.fq}</div></div>`;
+  h += `<div class="st">🥇 必吃 + 每天</div><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:12px">${daily.map(k=>{
+    const info = FG[k]; const ok = covered.has(k); const fq = dfq[k] || info.fq;
+    return `<div class="chk" style="flex-direction:column;align-items:center;gap:2px;padding:8px 6px;text-align:center"><div style="font-size:20px">${ok?'✅':'⭕'}</div><div class="nm" style="font-size:12px">${info.em} ${info.nm}</div><div class="fq" style="font-size:10px">${fq}</div></div>`;
   }).join('')}</div>`;
 
   // weekly
   h += `<div class="st">📆 适量摄入</div><div class="fbar">${weekly.map(k=>{
-    const info = FG[k]; const ok = covered.has(k);
-    return `<div class="fitem"><div style="font-size:22px;opacity:${ok?1:.4}">${info.em}</div><div class="nm" style="color:${ok?'var(--t)':'var(--s)'}">${info.nm}</div><div style="font-size:10px;color:var(--s);margin-top:1px">${info.fq}</div></div>`;
+    const info = FG[k]; const ok = covered.has(k); const fq = dfq[k] || info.fq;
+    return `<div class="fitem"><div style="font-size:22px;opacity:${ok?1:.4}">${info.em}</div><div class="nm" style="color:${ok?'var(--t)':'var(--s)'}">${info.nm}</div><div style="font-size:10px;color:var(--s);margin-top:1px">${fq}</div></div>`;
   }).join('')}</div>`;
 
   // limited
   const lim = limited.filter(k=>covered.has(k));
   if (lim.length) {
-    h += `<div class="card" style="border-left:4px solid var(--o)"><div style="color:var(--o);font-weight:600;font-size:13px">⚠️ 限食</div><div style="margin-top:4px">${lim.map(k=>FG[k].em+' '+FG[k].nm).join(' ')}</div></div>`;
+    h += `<div class="card" style="border-left:4px solid var(--o)"><div style="color:var(--o);font-weight:600;font-size:13px">⚠️ 忌口</div><div style="margin-top:4px">${lim.map(k=>{const fq=dfq[k];return FG[k].em+' '+FG[k].nm+(fq?' · '+fq:'');}).join(' | ')}</div></div>`;
   }
 
   // meal entries
@@ -1628,10 +1629,24 @@ const FG_VEG    = Object.keys(FG).filter(k => FG[k].cat === 'veg');     // 5 veg
 // Diet frameworks — each maps FG keys to diet-specific categories
 const DIETS = {
   modern: {
-    name:'现代健康饮食', em:'💪', desc:'均衡7大类，灵活搭配',
-    daily: ['vegLeafy','vegCruciferous','vegFruit','vegRoot','vegAllium','fruits','wholeGrains'],
-    weekly: ['legumes','nuts','oliveOil','fish','poultry','eggs','dairy'],
-    limited: ['redMeat','sweets'],
+    name:'MODERN饮食', em:'💪', desc:'必吃+适量+忌口，精准量化',
+    daily: ['oliveOil','vegLeafy','fruits'],        // 必吃+每天
+    weekly: ['eggs','poultry','vegRoot','legumes','nuts','wholeGrains','vegCruciferous','vegFruit','vegAllium','fish'],
+    limited: ['sweets','redMeat','dairy'],
+    // Custom frequency overrides
+    fq: {
+      oliveOil:'每天 >10g · 必吃',
+      vegLeafy:'每天 1–1.5 份',
+      fruits:'浆果+柑橘 每天 1–2 份',
+      vegRoot:'土豆 ≤0.75 份/天',
+      eggs:'每天 0.5–1 个',
+      poultry:'每天 ≤0.5 份',
+      sweets:'含糖饮料 · 完全不喝',
+      wholeGrains:'每天 3–5 份',
+      legumes:'适量',
+      nuts:'每天 1 小把',
+      fish:'每周 ≥2 次',
+    },
   },
   med: {
     name:'地中海饮食', em:'🫒', desc:'US News #1 最佳饮食',
