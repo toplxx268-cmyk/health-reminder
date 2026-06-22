@@ -1626,24 +1626,26 @@ const FG_ALL = Object.keys(FG);
 
 // Diet frameworks — each maps to the 9 FG categories
 const DIETS = {
-  modern: {
-    name:'MODERN饮食', em:'💪', desc:'9类精准量化',
-    daily: ['oliveOil','vegetables','fruits','wholeGrains','nuts'],
-    weekly: ['fish','legumes','poultryEggs','dairy'],
-    limited: ['sweets'],
-    fq: {
-      oliveOil:'每天 >10g · 必吃',
-      vegetables:'绿叶菜为主 每天 1–1.5 份',
-      fruits:'浆果+柑橘 每天 1–2 份',
-      wholeGrains:'每天 3–5 份',
-      nuts:'每天 1 小把',
-      fish:'每周 ≥2 次',
-      legumes:'每周 2–3 次',
-      poultryEggs:'鸡蛋 0.5–1个/天 · 禽肉 ≤0.5份/天',
-      dairy:'适量 · 低脂奶制品',
-      sweets:'含糖饮料 · 完全不喝',
-    },
-  },
+	  modern: {
+	    name:'MODERN饮食', em:'💪', desc:'精准量化，抗衰延寿',
+	    daily: ['oliveOil','leafyGreens','berries','rootVeg','eggs','poultry','wholeGrains','nuts'],
+	    weekly: ['fish','legumes','dairy'],
+	    limited: ['sweets'],
+	    fq: {
+	      oliveOil:'每天 >10g · 必吃',
+	      leafyGreens:'每天 1–1.5 份 · 绿叶菜',
+	      berries:'每天 1–2 份 · 浆果+柑橘',
+	      rootVeg:'每天 ≤0.75 份 · 土豆等',
+	      eggs:'每天 0.5–1 个',
+	      poultry:'每天 ≤0.5 份 · 禽肉',
+	      wholeGrains:'每天 3–5 份',
+	      nuts:'每天 1 小把',
+	      fish:'每周 ≥2 次',
+	      legumes:'每周 2–3 次',
+	      dairy:'适量 · 低脂奶制品',
+	      sweets:'含糖饮料 · 完全不喝',
+	    },
+	  },
   med: {
     name:'地中海饮食', em:'🫒', desc:'严格9类全覆盖',
     daily: ['vegetables','fruits','wholeGrains','oliveOil','nuts'],
