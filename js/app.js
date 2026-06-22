@@ -547,25 +547,49 @@ async function callTCMAI() {
   const model = apiEndpoint.includes('groq') ? 'llama-3.3-70b-versatile' : 'gpt-4o-mini';
   const symptomText = uncached.join('、');
 
-  // Use Supabase Edge Function as proxy (bypasses mobile Safari CORS restrictions)
+  // Build the TCM analysis prompt
+  const tcmPrompt = `你是中医养生专家。请针对以下症状给出中医分析及推荐。严格按JSON格式输出，不要markdown代码块：
+{
+  "analysis": "中医辨证分析（150字内，说明症状所属证型、病位、病机，给出调理原则）",
+  "foods": [{"food":"食物名","nature":"性味","action":"功效","note":"用法"}],
+  "teas": [{"key":"拼音","name":"茶名","nature":"性味","effects":["功效"],"caution":"注意"}],
+  "medications":[{"name":"中成药名/单味药名","type":"中成药/单味药","action":"功效主治","note":"用法用量与注意事项"}],
+  "points": [{"point":"穴位名","meridian":"经络","loc":"位置","tech":"手法"}]
+}
+症状：${symptomText}`;
+
+  // Try Supabase Edge Function first, fall back to direct API call
   const proxyUrl = SUPABASE_URL + '/functions/v1/tcm-ai';
 
   try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 45000);
-    const res = await fetch(proxyUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY },
-      body: JSON.stringify({ symptom: symptomText, apiKey: tcmAIKey, endpoint: apiEndpoint, model }),
-      signal: controller.signal
-    });
-    clearTimeout(timer);
-    if (!res.ok) {
-      const errData = await res.json().catch(() => ({}));
-      throw new Error(errData.error || ('HTTP '+res.status));
+    let text;
+    try {
+      // Try proxy (fixes mobile CORS)
+      const res = await fetch(proxyUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY },
+        body: JSON.stringify({ symptom: symptomText, apiKey: tcmAIKey, endpoint: apiEndpoint, model }),
+        signal: AbortSignal.timeout(45000)
+      });
+      if (!res.ok) { const ed = await res.json().catch(()=>({})); throw new Error(ed.error||('HTTP '+res.status)); }
+      const result = await res.json();
+      text = result.text || '';
+    } catch(proxyErr) {
+      // Fall back to direct API call if proxy unavailable (404/network error)
+      if (proxyErr.message.includes('HTTP 404') || proxyErr.message === 'Failed to fetch') {
+        const res2 = await fetch(apiEndpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tcmAIKey },
+          body: JSON.stringify({ model, messages: [{role:'user',content:tcmPrompt}], max_tokens: 2048, temperature: 0.7 }),
+          signal: AbortSignal.timeout(45000)
+        });
+        if (!res2.ok) { const ed = await res2.json().catch(()=>({})); throw new Error(ed.error?.message||('HTTP '+res2.status)); }
+        const data2 = await res2.json();
+        text = data2.choices?.[0]?.message?.content || '';
+      } else {
+        throw proxyErr;
+      }
     }
-    const result = await res.json();
-    let text = result.text || '';
     if (!text) throw new Error('API 返回为空，请检查 Key 是否正确');
     // strip markdown fences
     text = text.replace(/```json\n?/gi, '').replace(/```\n?/g, '').trim();
