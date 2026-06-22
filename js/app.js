@@ -520,16 +520,23 @@ function renderTCM() {
 
 // ─── AI Recommendation Engine ───
 function showAIKeyPrompt() {
-  const key = prompt('请输入 AI API Key（支持 OpenAI / Groq 等兼容接口）：\n\n🔑 API Key:', tcmAIKey || '');
-  if (key !== null) {
-    tcmAIKey = key.trim();
-    localStorage.setItem('tcm_aikey', tcmAIKey);
-    if (tcmAIKey) {
-      const ep = prompt('API 地址（默认 Groq 免费接口）：\n留空使用默认 Groq API', 'https://api.groq.com/openai/v1/chat/completions');
+  const key = prompt('请输入 Gemini API Key（免费，手机/电脑通用）：\n\n🔑 免费获取：aistudio.google.com\n📋 点击「Get API Key」→ 复制粘贴到这里\n\n（如需使用 Groq/OpenAI，输入 g:你的Key）', tcmAIKey || '');
+  if (key !== null && key.trim()) {
+    const k = key.trim();
+    if (k.startsWith('g:')) {
+      // Groq/OpenAI mode
+      tcmAIKey = k.slice(2).trim();
+      localStorage.setItem('tcm_aikey', tcmAIKey);
+      const ep = prompt('API 地址（默认 Groq）：', 'https://api.groq.com/openai/v1/chat/completions');
       if (ep !== null && ep.trim()) localStorage.setItem('tcm_aiendpoint', ep.trim());
-      showToast('✅ AI 已配置，点击「🤖 AI 智能推荐」试试吧');
-      renderTCM();
+    } else {
+      // Gemini mode (default)
+      tcmAIKey = k;
+      localStorage.setItem('tcm_aikey', tcmAIKey);
+      localStorage.removeItem('tcm_aiendpoint'); // use gemini default
     }
+    showToast('✅ AI 已配置，点击「🤖 AI 智能推荐」');
+    renderTCM();
   }
 }
 
@@ -543,8 +550,9 @@ async function callTCMAI() {
   const btn = document.getElementById('tcm-ai-btn');
   if (btn) { btn.textContent = '⏳ AI分析中...'; btn.disabled = true; }
 
-  const apiEndpoint = localStorage.getItem('tcm_aiendpoint') || 'https://api.groq.com/openai/v1/chat/completions';
-  const model = apiEndpoint.includes('groq') ? 'llama-3.3-70b-versatile' : 'gpt-4o-mini';
+  const apiEndpoint = localStorage.getItem('tcm_aiendpoint') || 'gemini';
+  const useGemini = apiEndpoint === 'gemini' || apiEndpoint.includes('googleapis');
+  const model = useGemini ? 'gemini-2.0-flash' : (apiEndpoint.includes('groq') ? 'llama-3.3-70b-versatile' : 'gpt-4o-mini');
   const symptomText = uncached.join('、');
 
   // Build the TCM analysis prompt
@@ -558,37 +566,37 @@ async function callTCMAI() {
 }
 症状：${symptomText}`;
 
-  // Try Supabase Edge Function first, fall back to direct API call
-  const proxyUrl = SUPABASE_URL + '/functions/v1/tcm-ai';
-
   try {
     let text;
-    try {
-      // Try proxy (fixes mobile CORS)
-      const res = await fetch(proxyUrl, {
+    if (useGemini) {
+      // Gemini API — key in URL param, no CORS preflight needed, works on mobile Safari
+      const geminiUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + tcmAIKey;
+      const res = await fetch(geminiUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY },
-        body: JSON.stringify({ symptom: symptomText, apiKey: tcmAIKey, endpoint: apiEndpoint, model }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents: [{parts:[{text:tcmPrompt}]}], generationConfig: {maxOutputTokens:2048, temperature:0.7} }),
         signal: AbortSignal.timeout(45000)
       });
-      if (!res.ok) { const ed = await res.json().catch(()=>({})); throw new Error(ed.error||('HTTP '+res.status)); }
-      const result = await res.json();
-      text = result.text || '';
-    } catch(proxyErr) {
-      // Fall back to direct API call if proxy unavailable (404/network error)
-      if (proxyErr.message.includes('HTTP 404') || proxyErr.message === 'Failed to fetch') {
-        const res2 = await fetch(apiEndpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tcmAIKey },
-          body: JSON.stringify({ model, messages: [{role:'user',content:tcmPrompt}], max_tokens: 2048, temperature: 0.7 }),
-          signal: AbortSignal.timeout(45000)
-        });
-        if (!res2.ok) { const ed = await res2.json().catch(()=>({})); throw new Error(ed.error?.message||('HTTP '+res2.status)); }
-        const data2 = await res2.json();
-        text = data2.choices?.[0]?.message?.content || '';
-      } else {
-        throw proxyErr;
+      if (!res.ok) {
+        const ed = await res.json().catch(()=>({}));
+        throw new Error((ed.error && ed.error.message) || ('HTTP '+res.status));
       }
+      const data = await res.json();
+      text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    } else {
+      // OpenAI-compatible API (Groq, OpenAI, etc.)
+      const res = await fetch(apiEndpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tcmAIKey },
+        body: JSON.stringify({ model, messages: [{role:'user',content:tcmPrompt}], max_tokens: 2048, temperature: 0.7 }),
+        signal: AbortSignal.timeout(45000)
+      });
+      if (!res.ok) {
+        const ed = await res.json().catch(()=>({}));
+        throw new Error(ed.error?.message || ed.error?.code || ('HTTP '+res.status));
+      }
+      const data = await res.json();
+      text = data.choices?.[0]?.message?.content || '';
     }
     if (!text) throw new Error('API 返回为空，请检查 Key 是否正确');
     // strip markdown fences
