@@ -293,6 +293,9 @@ let tcmLogs = [];
 let tcmLogDate = new Date();     // date for wellness log view
 let tcmTab = 'recommend';        // 'recommend' | 'log'
 let tcmScores = {};              // { 'YYYY-MM-DD': { energy, sleep, mood, discomfort } }
+let tcmAI = {};                  // cached AI results: { symptomKey: {foods:[], teas:[], points:[]} }
+let tcmAIKey = '';               // user's API key (stored in localStorage)
+let tcmAILoading = false;        // AI request in progress
 
 function renderSett() {
   tcmLogDate = new Date(); // always start on today
@@ -366,14 +369,15 @@ function renderTCM() {
       });
     }
 
-    const kws = isCustom ? [symName] : (allKW[sid] || [symName]);
+    // enhanced matching: preset keywords + character-level matching for custom symptoms
+    const kws = isCustom ? smartTokenize(symName) : (allKW[sid] || smartTokenize(symName));
 
     TEAS.forEach(t => {
       const txt = t.suitableFor + t.description + t.effects.join('');
       if (kws.some(kw => txt.includes(kw)) && !teas[t.key]) teas[t.key] = { ...t, matchSymptom: symName };
     });
     TEA_BLENDS.forEach(b => {
-      const txt = b.for + b.effects.join('') + b.name;
+      const txt = b.for + b.effects.join('') + b.name + b.ingredients.join('');
       if (kws.some(kw => txt.includes(kw)) && !blends[b.name]) blends[b.name] = b;
     });
     Object.entries(TCM_FOODS).forEach(([fk, flist]) => {
@@ -388,6 +392,14 @@ function renderTCM() {
         if (kws.some(kw => ptxt.includes(kw)) && !points[p.point]) points[p.point] = { ...p, symptoms: [symName] };
       });
     });
+
+    // merge cached AI results for this symptom
+    const aiResult = tcmAI[symName];
+    if (aiResult) {
+      (aiResult.foods||[]).forEach(f => { if (!foods[f.food]) foods[f.food] = { ...f, symptoms: [symName+'🤖'] }; });
+      (aiResult.teas||[]).forEach(t => { if (!teas[t.key]) teas[t.key] = { ...t, matchSymptom: symName+'🤖' }; });
+      (aiResult.points||[]).forEach(p => { if (!points[p.point]) points[p.point] = { ...p, symptoms: [symName+'🤖'] }; });
+    }
   });
 
   // === Food recommendations — 3-col cards ===
@@ -457,7 +469,97 @@ function renderTCM() {
     html += '</div>';
   }
 
+  // AI recommendation button for custom symptoms
+  const hasCustom = Array.from(tcmSelected).some(id => id.startsWith('cust_'));
+  if (hasCustom) {
+    const customNames = Array.from(tcmSelected).filter(id => id.startsWith('cust_')).map(id => tcmCustomMap[id]).filter(Boolean);
+    const allCached = customNames.every(n => tcmAI[n]);
+    if (!allCached && tcmAIKey) {
+      html += '<button onclick="callTCMAI()" id="tcm-ai-btn" style="display:block;width:100%;padding:12px;margin-top:12px;border-radius:12px;border:1.5px dashed var(--p);background:rgba(175,82,222,.04);color:var(--p);font-size:14px;font-weight:600;cursor:pointer"'+(tcmAILoading?' disabled':'')+'>'+(tcmAILoading?'⏳ AI分析中...':'🤖 AI 智能推荐')+'</button>';
+    } else if (!tcmAIKey) {
+      html += '<button onclick="showAIKeyPrompt()" style="display:block;width:100%;padding:12px;margin-top:12px;border-radius:12px;border:1.5px dashed var(--sep);background:#F9F9F9;color:var(--s);font-size:14px;cursor:pointer">🤖 AI 智能推荐 <span style="font-size:11px;opacity:.7">（需配置API Key）</span></button>';
+    }
+  }
+
   recEl.innerHTML = html;
+}
+
+// ─── AI Recommendation Engine ───
+function showAIKeyPrompt() {
+  const key = prompt('请输入 AI API Key（支持 OpenAI / Groq 等兼容接口）：\n\n🔑 API Key:', tcmAIKey || '');
+  if (key !== null) {
+    tcmAIKey = key.trim();
+    localStorage.setItem('tcm_aikey', tcmAIKey);
+    if (tcmAIKey) {
+      const ep = prompt('API 地址（默认 Groq 免费接口）：\n留空使用默认 Groq API', 'https://api.groq.com/openai/v1/chat/completions');
+      if (ep !== null && ep.trim()) localStorage.setItem('tcm_aiendpoint', ep.trim());
+      showToast('✅ AI 已配置，点击「🤖 AI 智能推荐」试试吧');
+      renderTCM();
+    }
+  }
+}
+
+async function callTCMAI() {
+  if (tcmAILoading) return;
+  const customNames = Array.from(tcmSelected).filter(id => id.startsWith('cust_')).map(id => tcmCustomMap[id]).filter(Boolean);
+  const uncached = customNames.filter(n => !tcmAI[n]);
+  if (uncached.length === 0) { renderTCM(); return; }
+
+  tcmAILoading = true;
+  const btn = document.getElementById('tcm-ai-btn');
+  if (btn) { btn.textContent = '⏳ AI分析中...'; btn.disabled = true; }
+
+  const endpoint = localStorage.getItem('tcm_aiendpoint') || 'https://api.groq.com/openai/v1/chat/completions';
+  const model = endpoint.includes('groq') ? 'llama-3.3-70b-versatile' : 'gpt-4o-mini';
+
+  const prompt = `你是中医养生专家。请针对以下症状，推荐中医食疗、茶饮和穴位按摩方案。严格按JSON格式输出，不要markdown代码块：
+{
+  "foods": [{"food":"食物名","nature":"性味（如温/寒/平）","action":"功效","note":"用法"}],
+  "teas": [{"key":"茶名拼音","name":"茶名","nature":"性味","effects":["功效1","功效2"],"caution":"注意事项"}],
+  "points": [{"point":"穴位名","meridian":"经络","loc":"位置","tech":"手法"}]
+}
+症状：${uncached.join('、')}`;
+
+  try {
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tcmAIKey },
+      body: JSON.stringify({ model, messages: [{role:'user',content:prompt}], max_tokens: 2048, temperature: 0.7 })
+    });
+    if (!res.ok) throw new Error('API error ' + res.status);
+    const data = await res.json();
+    let text = data.choices?.[0]?.message?.content || '';
+    // strip markdown fences
+    text = text.replace(/```json\n?/gi, '').replace(/```\n?/g, '').trim();
+    const parsed = JSON.parse(text);
+    // cache results for all queried symptoms
+    uncached.forEach(name => {
+      tcmAI[name] = {
+        foods: (parsed.foods||[]).slice(0, 6),
+        teas: (parsed.teas||[]).slice(0, 4),
+        points: (parsed.points||[]).slice(0, 4),
+      };
+    });
+    try { localStorage.setItem('tcm_ai', JSON.stringify(tcmAI)); } catch(e) {}
+    showToast('✅ AI 推荐已生成');
+    renderTCM();
+  } catch(e) {
+    showToast('❌ AI 请求失败: ' + (e.message||'未知错误'));
+    console.error('TCM AI error:', e);
+  } finally {
+    tcmAILoading = false;
+  }
+}
+
+// Enhanced tokenizer for custom symptoms: breaks into characters + 2-char substrings
+function smartTokenize(text) {
+  const tokens = [text]; // full text
+  const chars = text.replace(/[^一-鿿]/g, ''); // Chinese chars only
+  for (let i = 0; i < chars.length; i++) {
+    tokens.push(chars[i]);
+    if (i + 1 < chars.length) tokens.push(chars.slice(i, i+2));
+  }
+  return [...new Set(tokens)]; // dedupe
 }
 
 function buildKeywordMap() {
@@ -614,6 +716,8 @@ function fmtDateCN(d) {
 function loadTCMLogs() {
   try { tcmLogs = JSON.parse(localStorage.getItem('tcm_logs')||'[]'); } catch(e) { tcmLogs = []; }
   try { tcmScores = JSON.parse(localStorage.getItem('tcm_scores')||'{}'); } catch(e) { tcmScores = {}; }
+  try { tcmAI = JSON.parse(localStorage.getItem('tcm_ai')||'{}'); } catch(e) { tcmAI = {}; }
+  tcmAIKey = localStorage.getItem('tcm_aikey') || '';
 }
 function saveTCMLogs() {
   localStorage.setItem('tcm_logs', JSON.stringify(tcmLogs));
