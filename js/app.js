@@ -981,10 +981,8 @@ function renderEditForm() {
     }
     +`<div class="frm"><label>重复间隔</label><select onchange="editing.interval_minutes=this.value?parseInt(this.value):null">
       <option value="" ${!r.interval_minutes?'selected':''}>不重复</option>
-      <option value="5" ${r.interval_minutes===5?'selected':''}>5 分钟</option>
-      <option value="10" ${r.interval_minutes===10?'selected':''}>10 分钟</option>
-      <option value="20" ${r.interval_minutes===20?'selected':''}>20 分钟</option>
       <option value="30" ${r.interval_minutes===30?'selected':''}>30 分钟</option>
+      <option value="45" ${r.interval_minutes===45?'selected':''}>45 分钟</option>
       <option value="60" ${r.interval_minutes===60?'selected':''}>1 小时</option>
       <option value="120" ${r.interval_minutes===120?'selected':''}>2 小时</option>
       <option value="180" ${r.interval_minutes===180?'selected':''}>3 小时</option>
@@ -1319,9 +1317,9 @@ function showNewReminder() {
     <div class="frm"><label>时间</label><input type="time" value="12:00" onchange="newReminder.time=this.value+':00'"></div>
     <div class="frm"><label>提醒内容</label><textarea onchange="newReminder.message=this.value" rows="2" placeholder="显示在通知和仪表盘上"></textarea></div>
     <div class="frm"><label>重复间隔（可选）</label><select onchange="newReminder.interval_minutes=this.value?parseInt(this.value):null">
-      <option value="">不重复</option><option value="5">5分钟</option><option value="10">10分钟</option>
-      <option value="20">20分钟</option><option value="30">30分钟</option><option value="60">1小时</option><option value="120">2小时</option>
-      <option value="180">3小时</option><option value="360">6小时</option><option value="720">12小时</option>
+      <option value="">不重复</option><option value="30">30分钟</option><option value="45">45分钟</option>
+      <option value="60">1小时</option><option value="120">2小时</option><option value="180">3小时</option>
+      <option value="360">6小时</option><option value="720">12小时</option>
     </select></div>
   `;
   document.getElementById('mod-new').style.display = 'flex';
@@ -1395,8 +1393,11 @@ async function loadHistoricalData() {
   const now = new Date();
   let start, end;
   if (statMode === 'week') {
-    start = new Date(now); start.setDate(start.getDate() - start.getDay() - 7);
-    end = now;
+    // Use statDate to determine week start (Sunday-based)
+    const ref = statDate || now;
+    const dayOfWeek = ref.getDay();
+    start = new Date(ref); start.setDate(ref.getDate() - dayOfWeek);
+    end = new Date(start); end.setDate(start.getDate() + 6);
   } else if (statMode === 'month') {
     start = new Date(statDate.getFullYear(), statDate.getMonth(), 1);
     end = new Date(statDate.getFullYear(), statDate.getMonth()+1, 0);
@@ -1421,6 +1422,10 @@ function switchStat(mode) {
     const btn = document.getElementById('stat-'+m+'-btn');
     if (btn) { btn.style.background = mode===m?'var(--g)':'#F9F9F9'; btn.style.color = mode===m?'#fff':'var(--t)'; }
   });
+  loadHistoricalData();
+}
+function shiftStatWeek(n) {
+  statDate.setDate(statDate.getDate() + n);
   loadHistoricalData();
 }
 function shiftStatMonth(n) {
@@ -1453,9 +1458,15 @@ function renderStatContent() {
 
   // Calendar or week strip
   if (statMode === 'week') {
-    // Weekly date strip
+    // Weekly date strip with prev/next navigation
     const weekStart = new Date(minDate);
-    let wk = '<div class="card" style="padding:10px;margin-bottom:10px"><div style="display:flex;gap:4px;text-align:center">';
+    const weekEnd = new Date(maxDate);
+    let wk = '<div class="card" style="padding:10px;margin-bottom:10px">';
+    wk += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">';
+    wk += '<button onclick="shiftStatWeek(-7)" style="background:none;border:none;font-size:18px;cursor:pointer;color:var(--g)">‹</button>';
+    wk += '<span style="font-weight:600;font-size:13px">'+(weekStart.getMonth()+1)+'/'+weekStart.getDate()+' - '+(weekEnd.getMonth()+1)+'/'+weekEnd.getDate()+'</span>';
+    wk += '<button onclick="shiftStatWeek(7)" style="background:none;border:none;font-size:18px;cursor:pointer;color:var(--g)">›</button>';
+    wk += '</div><div style="display:flex;gap:4px;text-align:center">';
     const dayNames = ['日','一','二','三','四','五','六'];
     for (let i=0;i<7;i++) {
       const d = new Date(weekStart); d.setDate(d.getDate()+i);
@@ -1468,7 +1479,7 @@ function renderStatContent() {
       wk += '<div onclick="statSelectedDate=\''+ds+'\';renderStatContent()" style="flex:1;padding:6px 2px;border-radius:8px;background:'+bg+';color:'+clr+';cursor:pointer;font-size:'+(isToday||isSel?'13px':'11px')+'">';
       wk += '<div style="font-size:10px;opacity:.7">'+dayNames[d.getDay()]+'</div>';
       wk += '<div style="font-weight:'+(isToday||isSel?'700':'500')+'">'+d.getDate()+'</div>';
-      wk += '<div style="font-size:9px;margin-top:1px">'+(dailyCompCount[ds]||0)+'✓ '+(dailyDietCov[ds]||new Set()).size+'🥗</div>';
+      wk += '<div style="font-size:9px;margin-top:1px">'+(dailyCompCount[ds]||0)+'✓'+(dailyDietCov[ds]||new Set()).size+'🥗</div>';
       wk += '</div>';
     }
     wk += '</div></div>';
@@ -1549,26 +1560,6 @@ function renderStatContent() {
   // diet coverage bar chart
   html += '<div style="background:#F2F2F7;border-radius:10px;padding:10px"><div style="font-size:22px;font-weight:700;color:var(--b)">'+avgDiet+'%</div><div style="font-size:11px;color:var(--s);margin-bottom:4px">饮食覆盖率</div><div class="bar" style="height:6px"><div class="bar-f" style="width:'+avgDiet+'%;background:var(--b)"></div></div></div>';
   html += '</div></div>';
-
-  // Daily diet coverage bar chart
-  html += '<div class="card" style="margin-bottom:10px"><div style="font-weight:600;margin-bottom:8px">🥗 每日饮食覆盖（核心'+dietTotal+'类）</div>';
-  if (statMode==='week') {
-    for (let i=0;i<7;i++) {
-      const d = new Date(minDate); d.setDate(d.getDate()+i); const ds = ts(d);
-      const cov = (dailyDietCov[ds]||new Set()).size;
-      html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><span style="font-size:11px;color:var(--s);width:36px">'+['日','一','二','三','四','五','六'][d.getDay()]+' '+(d.getMonth()+1)+'/'+d.getDate()+'</span><div class="bar" style="flex:1;height:14px"><div class="bar-f" style="width:'+(cov/dietTotal*100)+'%;background:var(--b);border-radius:2px;min-width:2px"></div></div><span style="font-size:11px;font-weight:600;width:28px;color:var(--b)">'+cov+'/'+dietTotal+'</span></div>';
-    }
-  } else {
-    // month/year: show by-day bars
-    const days = [];
-    let cur = new Date(minDate);
-    while (cur <= new Date(maxDate)) { days.push(ts(cur)); cur.setDate(cur.getDate()+1); }
-    days.forEach(ds => {
-      const cov = (dailyDietCov[ds]||new Set()).size;
-      html += '<div style="display:flex;align-items:center;gap:4px;margin-bottom:2px"><span style="font-size:9px;color:var(--s);width:36px">'+ds.slice(5)+'</span><div class="bar" style="flex:1;height:10px"><div class="bar-f" style="width:'+(cov/dietTotal*100)+'%;background:var(--b);border-radius:2px;min-width:1px"></div></div><span style="font-size:9px;font-weight:600;width:20px;color:var(--b)">'+cov+'</span></div>';
-    });
-  }
-  html += '</div>';
 
   // Top reminders
   const reminderCompCounts = {};
