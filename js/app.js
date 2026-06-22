@@ -634,7 +634,32 @@ function saveTCMAssessment() {
   const inp = document.getElementById('tcm-discomfort-input');
   tcmScores[ds].discomfort = (inp?.value || '').trim();
   saveTCMScores();
+
+  // remove previous assessment entries for this date
+  tcmLogs = tcmLogs.filter(l => !(l.date === ds && l.type === 'assessment'));
+
+  // create log entries for each scored dimension
+  const now = new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'});
+  const score = tcmScores[ds];
+  const dims = [
+    {key:'energy', emoji:'⚡', label:'精力状态'},
+    {key:'sleep', emoji:'🌙', label:'睡眠质量'},
+    {key:'mood', emoji:'💛', label:'心情情绪'},
+  ];
+  dims.forEach(d => {
+    const v = score[d.key];
+    if (v) {
+      tcmLogs.push({id: Date.now().toString()+'_'+d.key, emoji:d.emoji, text:d.label+' · '+v+'分', date:ds, time:now, type:'assessment'});
+    }
+  });
+  // discomfort entry
+  if (score.discomfort) {
+    tcmLogs.push({id: Date.now().toString()+'_discomfort', emoji:'🤒', text:'不适：'+score.discomfort, date:ds, time:now, type:'assessment'});
+  }
+
+  saveTCMLogs();
   showToast('✅ 评估已保存');
+  renderTCM();
 }
 function saveTCMLogs() {
   localStorage.setItem('tcm_logs', JSON.stringify(tcmLogs));
