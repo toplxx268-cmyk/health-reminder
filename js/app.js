@@ -535,34 +535,38 @@ function renderTCMLogTab() {
     h += '<button onclick="tcmLogDate=new Date();renderTCM()" style="display:block;margin:0 auto 10px;font-size:12px;color:var(--b);background:none;border:none;cursor:pointer">回到今天</button>';
   }
 
-  // ── Daily scoring ──
+  // ── Daily scoring + log entries in one unified card ──
   const score = tcmScores[logDateStr] || {};
   const dims = [
-    {key:'energy', emoji:'⚡', label:'精力状态', opts:['😫 很累','😐 一般','🙂 尚可','💪 充沛','🔥 爆满']},
-    {key:'sleep', emoji:'🌙', label:'睡眠质量', opts:['😫 很差','😐 较差','🙂 一般','😊 不错','💤 极佳']},
-    {key:'mood', emoji:'💛', label:'心情情绪', opts:['😢 低落','😐 平淡','🙂 平静','😊 愉悦','🌟 超棒']},
+    {key:'energy', emoji:'⚡', label:'精力状态'},
+    {key:'sleep', emoji:'🌙', label:'睡眠质量'},
+    {key:'mood', emoji:'💛', label:'心情情绪'},
   ];
-  h += '<div class="card" style="padding:12px 14px;margin-bottom:10px"><div style="font-weight:600;font-size:13px;margin-bottom:10px">📊 今日状态评估</div>';
+  h += '<div class="card" style="padding:14px;margin-bottom:0;border-radius:14px 14px 0 0">';
+  h += '<div style="font-weight:600;font-size:14px;margin-bottom:10px">📊 今日评估</div>';
   dims.forEach(d => {
     const cur = score[d.key] || 0;
-    h += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px"><span style="font-size:14px;width:22px;text-align:center">'+d.emoji+'</span><span style="font-size:12px;width:56px;color:var(--s);flex-shrink:0">'+d.label+'</span><div style="display:flex;gap:3px;flex:1">';
+    h += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><span style="font-size:14px;width:22px;text-align:center">'+d.emoji+'</span><span style="font-size:12px;width:52px;color:var(--s);flex-shrink:0">'+d.label+'</span><div style="display:flex;gap:4px;flex:1">';
     for (let i = 1; i <= 5; i++) {
-      h += '<button onclick="setTCMScore(\''+d.key+'\','+i+')" style="flex:1;padding:5px 0;border-radius:6px;border:1.5px solid '+(cur===i?'var(--g)':'var(--sep)')+';background:'+(cur===i?'rgba(52,199,89,.12)':'#fff')+';font-size:11px;cursor:pointer;font-weight:'+(cur===i?'600':'400')+';color:'+(cur===i?'var(--g)':'var(--s)')+';transition:all .1s">'+i+'</button>';
+      h += '<button onclick="setTCMScore(\''+d.key+'\','+i+')" style="flex:1;padding:6px 0;border-radius:8px;border:1.5px solid '+(cur===i?'var(--g)':'var(--sep)')+';background:'+(cur===i?'rgba(52,199,89,.12)':'#fff')+';font-size:12px;cursor:pointer;font-weight:'+(cur===i?'600':'400')+';color:'+(cur===i?'var(--g)':'var(--s)')+'">'+i+'</button>';
     }
     h += '</div></div>';
   });
-  // discomfort note
-  h += '<div style="display:flex;align-items:center;gap:6px;margin-top:4px"><span style="font-size:14px;width:22px;text-align:center">🤒</span><span style="font-size:12px;width:56px;color:var(--s);flex-shrink:0">今日不适</span><input type="text" id="tcm-discomfort-input" value="'+(score.discomfort||'')+'" placeholder="如：头疼、胃胀..." style="flex:1;padding:7px 10px;border-radius:6px;border:1.5px solid var(--sep);font-size:12px;outline:none" onchange="setTCMDiscomfort(this.value)"></div>';
+  // discomfort + save button row
+  h += '<div style="display:flex;align-items:center;gap:6px;margin-top:8px"><span style="font-size:14px;width:22px;text-align:center">🤒</span><span style="font-size:12px;width:52px;color:var(--s);flex-shrink:0">今日不适</span><input type="text" id="tcm-discomfort-input" value="'+(score.discomfort||'')+'" placeholder="如：头疼、胃胀..." style="flex:1;padding:7px 10px;border-radius:8px;border:1.5px solid var(--sep);font-size:12px;outline:none"></div>';
+  h += '<button onclick="saveTCMAssessment()" style="display:block;width:100%;margin-top:10px;padding:10px;border-radius:10px;border:none;background:var(--g);color:#fff;font-size:14px;font-weight:600;cursor:pointer">💾 保存评估</button>';
   h += '</div>';
 
-  // log entries
+  // log entries — attached to assessment card
+  h += '<div style="background:var(--card);border-radius:0 0 14px 14px;padding:0 14px 14px;border-top:1px solid #F2F2F7">';
   if (todayLogs.length === 0) {
-    h += '<div class="card" style="text-align:center;color:var(--s);padding:24px">'+(isToday?'今天还没有记录':'当天没有记录')+'<br>点击下方按钮快速记录</div>';
+    h += '<div style="text-align:center;color:var(--s);padding:16px 0 8px;font-size:13px">'+(isToday?'今天还没有记录':'当天没有记录')+'</div>';
   } else {
     todayLogs.forEach(l => {
-      h += '<div class="tcm-item" style="display:flex;justify-content:space-between;align-items:center"><div><div style="font-weight:600;font-size:14px">'+(l.emoji||'✅')+' '+l.text+'</div><div style="font-size:11px;color:var(--s)">'+l.time+'</div></div><button onclick="deleteTCMLog(\''+l.id+'\')" style="background:none;border:none;color:var(--r);cursor:pointer;font-size:16px;opacity:.5">✕</button></div>';
+      h += '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #F2F2F7"><div><span style="font-weight:500;font-size:13px">'+(l.emoji||'✅')+' '+l.text+'</span><span style="font-size:11px;color:var(--s);margin-left:8px">'+l.time+'</span></div><button onclick="deleteTCMLog(\''+l.id+'\')" style="background:none;border:none;color:var(--r);cursor:pointer;font-size:14px;opacity:.4">✕</button></div>';
     });
   }
+  h += '</div>';
 
   h += '<div class="st" style="margin-top:16px">快捷记录</div><div style="display:flex;flex-wrap:wrap;gap:6px">';
   [{emoji:'🍵',text:'喝茶养生'},{emoji:'💆',text:'穴位按摩'},{emoji:'🧘',text:'太极/八段锦'},{emoji:'🦶',text:'泡脚'},{emoji:'☀️',text:'晒太阳'},{emoji:'🧎',text:'冥想静坐'},{emoji:'🍲',text:'食疗调理'},{emoji:'📿',text:'经络推拿'},{emoji:'🌿',text:'艾灸'},{emoji:'💪',text:'五禽戏'},{emoji:'🧑‍🤝‍🧑',text:'站桩'},{emoji:'😴',text:'子午觉'}].forEach(q => {
@@ -624,11 +628,13 @@ function setTCMScore(key, val) {
   saveTCMScores();
   renderTCM();
 }
-function setTCMDiscomfort(val) {
+function saveTCMAssessment() {
   const ds = ts(tcmLogDate);
   if (!tcmScores[ds]) tcmScores[ds] = {};
-  tcmScores[ds].discomfort = val.trim();
+  const inp = document.getElementById('tcm-discomfort-input');
+  tcmScores[ds].discomfort = (inp?.value || '').trim();
   saveTCMScores();
+  showToast('✅ 评估已保存');
 }
 function saveTCMLogs() {
   localStorage.setItem('tcm_logs', JSON.stringify(tcmLogs));
