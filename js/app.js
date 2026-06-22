@@ -1631,7 +1631,7 @@ const DIETS = {
   modern: {
     name:'MODERN饮食', em:'💪', desc:'必吃+适量+忌口，精准量化',
     daily: ['oliveOil','vegLeafy','fruits'],        // 必吃+每天
-    weekly: ['eggs','poultry','vegRoot','legumes','nuts','wholeGrains','vegCruciferous','vegFruit','vegAllium','fish'],
+    weekly: ['eggs','poultry','vegRoot'],            // 适量3类
     limited: ['sweets','redMeat','dairy'],
     // Custom frequency overrides
     fq: {
