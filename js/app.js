@@ -189,13 +189,22 @@ function renderDash() {
     +`<div class="bar"><div class="bar-f" style="width:${pct*100}%"></div></div></div></div>`;
 
   // task blocks
+  html += '<div class="st" style="display:flex;justify-content:space-between;align-items:center">📅 任务<button onclick="event.stopPropagation();showNewBlock()" style="width:28px;height:28px;border-radius:50%;border:none;background:var(--g);color:#fff;font-size:18px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center">+</button></div>';
   if (blocks.length > 0) {
-    html += `<div class="st">📅 任务</div>`;
     blocks.forEach(r => {
       const s = (r.time||'09:00').slice(0,5);
       const e = (r.active_hours_end||'12:00').slice(0,5);
       const isDone = doneIds.has(r.id);
-      html += `<div class="tblock" onclick="openEdit('${r.id}')" style="cursor:pointer"><div class="ind"></div><div style="flex:1"><div${isDone?' style="text-decoration:line-through;color:var(--s)"':''}>📝 ${r.title}</div><div style="font-size:12px;color:var(--s)">${s} – ${e}</div></div>`
+      // countdown for future-dated tasks
+      const tgtDate = r.video_link && r.video_link.startsWith('date:') ? r.video_link.slice(5) : null;
+      let cdHtml = '';
+      if (tgtDate) {
+        const tgt = new Date(tgtDate);
+        const daysLeft = Math.ceil((tgt - new Date()) / 86400000);
+        if (daysLeft > 0) cdHtml = `<span style="font-size:11px;color:var(--o);margin-left:6px">⏳ 还有${daysLeft}天</span>`;
+        else if (daysLeft === 0) cdHtml = `<span style="font-size:11px;color:var(--r);margin-left:6px">📌 今天截止</span>`;
+      }
+      html += `<div class="tblock" onclick="openEdit('${r.id}')" style="cursor:pointer"><div class="ind"></div><div style="flex:1"><div${isDone?' style="text-decoration:line-through;color:var(--s)"':''}>📝 ${r.title}${cdHtml}</div><div style="font-size:12px;color:var(--s)">${tgtDate?tgtDate+' ':''}${s} – ${e}</div></div>`
         +`<div style="flex-shrink:0">`
         +(isDone
           ?`<button style="font-size:20px;color:var(--g);background:none;border:none;cursor:pointer;padding:4px" onclick="event.stopPropagation();toggleComplete('${r.id}',true)">✓</button>`
@@ -205,7 +214,7 @@ function renderDash() {
   }
 
   // point reminders
-  html += `<div class="st">⏰ 今日提醒</div>`;
+  html += '<div class="st" style="display:flex;justify-content:space-between;align-items:center">⏰ 今日提醒<button onclick="event.stopPropagation();showNewReminder()" style="width:28px;height:28px;border-radius:50%;border:none;background:var(--g);color:#fff;font-size:18px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center">+</button></div>';
   if (points.length===0) {
     html += '<p style="text-align:center;color:var(--s);margin:32px 0">✅ 所有提醒已完成！</p>';
   }
@@ -425,6 +434,15 @@ function renderTCM() {
       html += '<div class="card" style="margin-bottom:12px;border-left:3px solid var(--p);position:relative">';
       html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><span style="font-weight:600;font-size:14px;color:var(--p)">🤖 AI分析建议</span><span style="font-size:11px;color:var(--s)">针对：'+name+'</span></div>';
       html += '<div style="font-size:13px;line-height:1.7;color:var(--t)">'+ai.analysis+'</div>';
+      // medication suggestions inside analysis panel
+      if (ai.medications && ai.medications.length > 0) {
+        html += '<div style="margin-top:10px;padding-top:10px;border-top:1px solid #F2F2F7">';
+        html += '<div style="font-size:12px;font-weight:600;color:var(--r);margin-bottom:6px">💊 用药建议（仅供参考，请遵医嘱）</div>';
+        ai.medications.forEach(m => {
+          html += '<div style="margin-bottom:6px;font-size:12px"><span style="font-weight:600">'+m.name+'</span><span style="font-size:10px;background:rgba(255,59,48,.1);color:var(--r);padding:1px 6px;border-radius:4px;margin-left:4px">'+(m.type||'中成药')+'</span><div style="color:var(--g);margin-top:1px">'+m.action+'</div><div style="color:var(--s);margin-top:1px">'+m.note+'</div></div>';
+        });
+        html += '</div>';
+      }
       html += '<button onclick="clearAISymptom(\''+name+'\')" style="position:absolute;top:8px;right:8px;background:none;border:none;font-size:14px;color:var(--s);cursor:pointer;opacity:.4">✕</button>';
       html += '</div>';
     });
@@ -564,6 +582,7 @@ async function callTCMAI() {
         analysis: parsed.analysis || '',
         foods: (parsed.foods||[]).slice(0, 6),
         teas: (parsed.teas||[]).slice(0, 4),
+        medications: (parsed.medications||[]).slice(0, 4),
         points: (parsed.points||[]).slice(0, 4),
       };
     });
@@ -871,8 +890,11 @@ function renderEditForm() {
     +`<label class="tgl" style="display:inline-block"><input type="checkbox" ${r.is_enabled?'checked':''} onchange="editing.is_enabled=this.checked"><span class="sl"></span></label></div>`
     +`<div class="frm"><label>图标</label><input type="text" value="${emoji(r.type)}" maxlength="4" onchange="var em=this.value||'⏰';editing._newEmoji=em" style="font-size:24px;width:60px;text-align:center"></div>`
     +`<div class="frm"><label>提醒名称</label><input type="text" value="${r.title}" onchange="editing.title=this.value"></div>`
-    +`<div class="frm"><label>开始时间</label><input type="time" value="${r.time.slice(0,5)}" onchange="editing.time=this.value+':00'"></div>`
-    +`<div class="frm"><label>结束时间（可选）</label><input type="time" value="${(r.active_hours_end||'').slice(0,5)}" onchange="var v=this.value;editing.active_hours_end=v?v+':00':null"><div class="hint">设置后会在结束时也发提醒</div></div>`
+    +`<div class="frm"><label>时间</label><div style="display:flex;gap:8px;align-items:center"><input type="time" value="${r.time.slice(0,5)}" onchange="editing.time=this.value+':00'" style="flex:1"><span style="color:var(--s);font-size:13px">至</span><input type="time" value="${(r.active_hours_end||'').slice(0,5)}" onchange="var v=this.value;editing.active_hours_end=v?v+':00':null" style="flex:1"></div><div class="hint">结束时间可选，设置后在仪表盘显示时间段</div></div>`;
+    if (_isBlock(r)) {
+      const tgtDate = r.video_link && r.video_link.startsWith('date:') ? r.video_link.slice(5) : '';
+      h += `<div class="frm"><label>📅 目标日期</label><input type="date" value="${tgtDate}" onchange="editing._targetDate=this.value"><div class="hint">设置后在任务旁显示倒数天数</div></div>`;
+    }
     +`<div class="frm"><label>重复间隔</label><select onchange="editing.interval_minutes=this.value?parseInt(this.value):null">
       <option value="" ${!r.interval_minutes?'selected':''}>不重复</option>
       <option value="5" ${r.interval_minutes===5?'selected':''}>5 分钟</option>
@@ -916,6 +938,11 @@ async function saveEdit() {
       newType = r._newEmoji; // preset type, replace entirely
     }
   }
+  // handle target date for task blocks
+  let vidLink = r.video_link || null;
+  if (r._targetDate !== undefined) {
+    vidLink = r._targetDate ? 'date:' + r._targetDate : null;
+  }
   await supabase.from('reminders').update({
     type: newType,
     is_enabled: r.is_enabled, time: r.time, message: r.message,
@@ -923,7 +950,7 @@ async function saveEdit() {
     interval_minutes: r.interval_minutes||null,
     active_hours_end: r.active_hours_end||null,
     active_hours_start: r.interval_minutes ? r.time : null,
-    video_link: r.video_link||null, selected_tea_key: r.selected_tea_key||null,
+    video_link: vidLink, selected_tea_key: r.selected_tea_key||null,
   }).eq('id', r.id);
   const local = reminders.find(x=>x.id===r.id);
   if (local) {
@@ -1217,11 +1244,12 @@ function showNewBlock() {
     title: '', type: 'writing', is_enabled: true, time: '09:00',
     message: '', active_hours_start: '09:00', active_hours_end: '12:00',
     interval_minutes: null, video_link: null, selected_tea_key: null,
+    _targetDate: '',
   };
   document.getElementById('newblock-body').innerHTML = `
     <div class="frm"><label>任务名称</label><input type="text" placeholder="例如：写论文、午休" onchange="newBlock.title=this.value"></div>
-    <div class="frm"><label>开始时间</label><input type="time" value="09:00" onchange="newBlock.time=this.value+':00';newBlock.active_hours_start=this.value+':00'"></div>
-    <div class="frm"><label>结束时间</label><input type="time" value="12:00" onchange="newBlock.active_hours_end=this.value+':00'"></div>
+    <div class="frm"><label>时间</label><div style="display:flex;gap:8px;align-items:center"><input type="time" value="09:00" onchange="newBlock.time=this.value+':00';newBlock.active_hours_start=this.value+':00'" style="flex:1"><span style="color:var(--s);font-size:13px">至</span><input type="time" value="12:00" onchange="newBlock.active_hours_end=this.value+':00'" style="flex:1"></div></div>
+    <div class="frm"><label>📅 目标日期（可选）</label><input type="date" onchange="newBlock._targetDate=this.value"><div class="hint">设置后显示倒数天数</div></div>
     <div class="frm"><label>提醒内容</label><textarea onchange="newBlock.message=this.value" rows="2" placeholder="显示在仪表盘上"></textarea></div>
   `;
   document.getElementById('mod-newblock').style.display = 'flex';
@@ -1230,10 +1258,12 @@ function showNewBlock() {
 async function saveNewBlock() {
   if (!newBlock.title.trim()) { alert('请输入任务名称'); return; }
   const r = newBlock;
+  const vidLink = r._targetDate ? 'date:' + r._targetDate : null;
   const { data, error } = await supabase.from('reminders').insert({
     user_id: user.id, type: 'writing_' + Date.now(), title: r.title.trim(),
     is_enabled: true, time: r.time, message: r.message || r.title,
     active_hours_start: r.active_hours_start, active_hours_end: r.active_hours_end,
+    video_link: vidLink,
   }).select();
   if (error) { alert('创建失败: '+error.message); return; }
   if (data) {

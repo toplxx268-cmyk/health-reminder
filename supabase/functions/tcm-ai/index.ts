@@ -34,6 +34,7 @@ serve(async (req: Request) => {
   "analysis": "中医辨证分析（150字内，说明症状所属证型、病位、病机，给出调理原则）",
   "foods": [{"food":"食物名","nature":"性味","action":"功效","note":"用法"}],
   "teas": [{"key":"拼音","name":"茶名","nature":"性味","effects":["功效"],"caution":"注意"}],
+  "medications":[{"name":"中成药名/单味药名","type":"中成药/单味药","action":"功效主治","note":"用法用量与注意事项"}],
   "points": [{"point":"穴位名","meridian":"经络","loc":"位置","tech":"手法"}]
 }
 症状：${symptom}`;
