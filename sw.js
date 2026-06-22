@@ -1,6 +1,6 @@
 // 健康提醒 — Service Worker (offline cache + PWA)
 
-const CACHE = 'health-reminder-v6';
+const CACHE = 'health-reminder-v7';
 const URLS = [
   '/health-reminder/',
   '/health-reminder/index.html',
