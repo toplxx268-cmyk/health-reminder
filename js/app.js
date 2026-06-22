@@ -1609,21 +1609,29 @@ const FG = {
   fish:        {em:'🐟', nm:'鱼虾海鲜', fq:'每周≥2次', ds:'三文鱼、沙丁鱼等富含Omega-3。', ex:['三文鱼','沙丁鱼','鳕鱼','虾','贻贝']},
   poultryEggs: {em:'🐔', nm:'禽肉蛋', fq:'每周2-3次', ds:'鸡胸肉、鸡蛋，去皮蒸煮最佳。', ex:['鸡胸肉','鸡蛋','鸭肉','鹌鹑蛋']},
   dairy:       {em:'🧀', nm:'乳制品', fq:'适量', ds:'优选发酵乳制品，希腊酸奶等。', ex:['希腊酸奶','奶酪','牛奶','开菲尔']},
+  // MODERN细分
+  leafyGreens: {em:'🥬', nm:'叶菜类', fq:'每天 1–1.5 份', ds:'菠菜、生菜、油菜等深色绿叶菜。', ex:['菠菜','生菜','油菜','茼蒿','小白菜']},
+  berries:     {em:'🍓', nm:'浆果+柑橘', fq:'每天 1–2 份', ds:'蓝莓、草莓、橙子等。', ex:['蓝莓','草莓','橙子','树莓']},
+  rootVeg:     {em:'🥕', nm:'根茎类(土豆)', fq:'≤0.75 份/天', ds:'土豆为主，胡萝卜山药适量。', ex:['土豆','胡萝卜','红薯','山药']},
+  eggs:        {em:'🥚', nm:'鸡蛋', fq:'每天 0.5–1 个', ds:'水煮蛋或水波蛋最佳。', ex:['鸡蛋','鹌鹑蛋']},
+  poultry:     {em:'🐔', nm:'禽肉', fq:'每天 ≤0.5 份', ds:'鸡胸肉，去皮蒸煮。', ex:['鸡胸肉','火鸡肉']},
 };
-const FG_ALL = Object.keys(FG); // 9 categories
+const FG_ALL = Object.keys(FG);
 
 // Diet frameworks — each maps to the 9 FG categories
 const DIETS = {
   modern: {
     name:'MODERN饮食', em:'💪', desc:'必吃+适量+忌口，精准量化',
-    daily: ['oliveOil','vegetables','fruits'],
-    weekly: ['poultryEggs'],
-    limited: ['sweets','dairy'],
+    daily: ['oliveOil','leafyGreens','berries'],
+    weekly: ['eggs','poultry','rootVeg'],
+    limited: ['sweets'],
     fq: {
       oliveOil:'每天 >10g · 必吃',
-      vegetables:'绿叶菜为主 每天 1–1.5 份',
-      fruits:'浆果+柑橘 每天 1–2 份',
-      poultryEggs:'鸡蛋 0.5–1个/天 · 禽肉 ≤0.5份/天',
+      leafyGreens:'每天 1–1.5 份',
+      berries:'每天 1–2 份',
+      eggs:'每天 0.5–1 个',
+      poultry:'每天 ≤0.5 份',
+      rootVeg:'≤0.75 份/天',
       sweets:'含糖饮料 · 完全不喝',
     },
   },
@@ -1658,9 +1666,9 @@ let dietMode = 'modern'; // 'modern' | 'med' | 'mind'
 // ─── AI Food Classifier: keyword → FG key ───
 const FOOD_KW = {
   // 叶菜类
-  '菠菜':'vegetables','生菜':'vegetables','油菜':'vegetables','茼蒿':'vegetables','小白菜':'vegetables','芝麻菜':'vegetables',
-  '空心菜':'vegetables','苋菜':'vegetables','芥菜':'vegetables','娃娃菜':'vegetables','大白菜':'vegetables','卷心菜':'vegetables',
-  '青菜':'vegetables','菜心':'vegetables','油麦菜':'vegetables','豌豆苗':'vegetables','芽苗菜':'vegetables','苦菊':'vegetables',
+  '菠菜':'leafyGreens','生菜':'leafyGreens','油菜':'leafyGreens','茼蒿':'leafyGreens','小白菜':'leafyGreens','芝麻菜':'leafyGreens',
+  '空心菜':'leafyGreens','苋菜':'leafyGreens','芥菜':'leafyGreens','娃娃菜':'leafyGreens','大白菜':'leafyGreens','卷心菜':'vegetables',
+  '青菜':'leafyGreens','菜心':'leafyGreens','油麦菜':'leafyGreens','豌豆苗':'leafyGreens','芽苗菜':'leafyGreens','苦菊':'leafyGreens',
   // 十字花科
   '西兰花':'vegetables','花椰菜':'vegetables','西蓝花':'vegetables','菜花':'vegetables',
   '卷心菜':'vegetables','甘蓝':'vegetables','羽衣甘蓝':'vegetables','芥蓝':'vegetables',
@@ -1670,15 +1678,15 @@ const FOOD_KW = {
   '茄子':'vegetables','黄瓜':'vegetables','西葫芦':'vegetables','秋葵':'vegetables','南瓜':'vegetables',
   '辣椒':'vegetables','朝天椒':'vegetables','丝瓜':'vegetables','苦瓜':'vegetables','冬瓜':'vegetables',
   // 根茎类
-  '胡萝卜':'vegetables','萝卜':'vegetables','胡萝卜':'vegetables','白萝卜':'vegetables','甜菜':'vegetables','红薯':'vegetables',
-  '山药':'vegetables','莲藕':'vegetables','土豆':'vegetables','马铃薯':'vegetables','芋头':'vegetables','莴笋':'vegetables',
+  '胡萝卜':'rootVeg','萝卜':'vegetables','胡萝卜':'rootVeg','白萝卜':'vegetables','甜菜':'vegetables','红薯':'rootVeg',
+  '山药':'rootVeg','莲藕':'vegetables','土豆':'rootVeg','马铃薯':'rootVeg','芋头':'vegetables','莴笋':'vegetables',
   '竹笋':'vegetables','芦笋':'vegetables','茭白':'vegetables','牛蒡':'vegetables','紫薯':'vegetables',
   // 葱蒜类
   '洋葱':'vegetables','大蒜':'vegetables','蒜':'vegetables','韭菜':'vegetables','葱':'vegetables','蒜苗':'vegetables',
   '红葱头':'vegetables','大葱':'vegetables','小葱':'vegetables','蒜薹':'vegetables','韭黄':'vegetables',
   // 水果
   '苹果':'fruits','橙子':'fruits','橘子':'fruits','葡萄':'fruits','石榴':'fruits','无花果':'fruits',
-  '莓果':'fruits','蓝莓':'fruits','草莓':'fruits','香蕉':'fruits','梨':'fruits','西瓜':'fruits',
+  '莓果':'fruits','蓝莓':'berries','草莓':'berries','香蕉':'fruits','梨':'fruits','西瓜':'fruits',
   '芒果':'fruits','木瓜':'fruits','猕猴桃':'fruits','桃子':'fruits','樱桃':'fruits','柚子':'fruits',
   '柠檬':'fruits','火龙果':'fruits','柿子':'fruits','荔枝':'fruits','龙眼':'fruits','菠萝':'fruits',
   '蜜瓜':'fruits','哈密瓜':'fruits',
@@ -1707,10 +1715,10 @@ const FOOD_KW = {
   '海鲈':'fish','青花鱼':'fish','秋刀鱼':'fish','牡蛎':'fish','蛤蜊':'fish','扇贝':'fish',
   '鱿鱼':'fish','章鱼':'fish','螃蟹':'fish','蟹':'fish','龙虾':'fish','鳗鱼':'fish',
   // 禽肉
-  '鸡肉':'poultryEggs','鸡胸':'poultryEggs','鸡腿':'poultryEggs','鸭肉':'poultryEggs','火鸡':'poultryEggs','鹌鹑':'poultryEggs',
-  '鸽子':'poultryEggs','禽肉':'poultryEggs','鸡':'poultryEggs','鸭':'poultryEggs',
+  '鸡肉':'poultry','鸡胸':'poultry','鸡腿':'poultry','鸭肉':'poultry','火鸡':'poultry','鹌鹑':'poultryEggs',
+  '鸽子':'poultryEggs','禽肉':'poultry','鸡':'poultry','鸭':'poultry',
   // 鸡蛋
-  '鸡蛋':'poultryEggs','蛋':'poultryEggs','鹌鹑蛋':'poultryEggs','鸭蛋':'poultryEggs','蛋黄':'poultryEggs','蛋白':'poultryEggs',
+  '鸡蛋':'eggs','蛋':'eggs','鹌鹑蛋':'eggs','鸭蛋':'eggs','蛋黄':'eggs','蛋白':'eggs',
   // 乳制品
   '酸奶':'dairy','希腊酸奶':'dairy','奶酪':'dairy','芝士':'dairy','羊奶酪':'dairy',
   '牛奶':'dairy','开菲尔':'dairy','乳制品':'dairy','奶':'dairy','黄油':'dairy','奶油':'dairy',
