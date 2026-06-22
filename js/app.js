@@ -292,6 +292,7 @@ let tcmCustomMap = {};           // 'cust_N' → display name
 let tcmLogs = [];
 let tcmLogDate = new Date();     // date for wellness log view
 let tcmTab = 'recommend';        // 'recommend' | 'log'
+let tcmScores = {};              // { 'YYYY-MM-DD': { energy, sleep, mood, discomfort } }
 
 function renderSett() {
   tcmLogDate = new Date(); // always start on today
@@ -318,23 +319,25 @@ function renderTCM() {
   }
 
   // === RECOMMEND TAB ===
-  let tagHtml = '';
+  let tagHtml = '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">';
   const allEntries = [
     ...TCM_SYMPTOMS.map(s => ({id:s.id, nm:s.nm, em:s.catEm, isCustom:false})),
     ...Object.entries(tcmCustomMap).map(([id, nm]) => ({id, nm, em:'✏️', isCustom:true}))
   ];
   allEntries.forEach(s => {
     const sel = tcmSelected.has(s.id);
-    const st = s.isCustom
-      ? 'border:1.5px solid '+(sel?'var(--b)':'var(--sep)')+';background:'+(sel?'rgba(0,122,255,.1)':'#fff')+';color:'+(sel?'var(--b)':'var(--t)')
-      : 'border:1.5px solid '+(sel?'var(--g)':'var(--sep)')+';background:'+(sel?'rgba(52,199,89,.12)':'#fff');
-    // cleaner inline × — subtle, inside the chip
-    const delBtn = (sel || s.isCustom)
-      ? '<span onclick="event.stopPropagation();removeSymptom(\''+s.id+'\')" style="display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;margin-left:2px;margin-right:-2px;border-radius:50%;background:rgba(0,0,0,.08);color:var(--s);font-size:10px;line-height:1;cursor:pointer;transition:all .15s" onmouseover="this.style.background=\'rgba(255,59,48,.15)\';this.style.color=\'var(--r)\'" onmouseout="this.style.background=\'rgba(0,0,0,.08)\';this.style.color=\'var(--s)\'">✕</span>'
-      : '';
-    tagHtml += '<button onclick="toggleSymptom(\''+s.id+'\')" style="display:inline-flex;align-items:center;padding:6px 10px;border-radius:20px;'+st+';font-size:13px;cursor:pointer;white-space:nowrap">'+s.em+' '+s.nm+(sel?' ✓':'')+delBtn+'</button>';
+    const borderClr = s.isCustom ? (sel ? 'var(--b)' : 'var(--sep)') : (sel ? 'var(--g)' : 'var(--sep)');
+    const bg = s.isCustom ? (sel ? 'rgba(0,122,255,.08)' : '#fff') : (sel ? 'rgba(52,199,89,.08)' : '#fff');
+    tagHtml += '<div onclick="toggleSymptom(\''+s.id+'\')" style="position:relative;background:'+bg+';border:1.5px solid '+borderClr+';border-radius:12px;padding:12px 6px 8px;text-align:center;cursor:pointer;transition:all .15s;-webkit-tap-highlight-color:transparent">'
+      + (sel ? '<span style="position:absolute;top:4px;right:6px;font-size:10px;color:var(--g)">✓</span>' : '')
+      + ((sel||s.isCustom) ? '<span onclick="event.stopPropagation();removeSymptom(\''+s.id+'\')" style="position:absolute;top:4px;right:'+(sel?'18px':'4px')+';width:16px;height:16px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:9px;color:var(--s);background:rgba(0,0,0,.06);cursor:pointer" onmouseover="this.style.background=\'rgba(255,59,48,.15)\';this.style.color=\'var(--r)\'" onmouseout="this.style.background=\'rgba(0,0,0,.06)\';this.style.color=\'var(--s)\'">✕</span>' : '')
+      + '<div style="font-size:26px;margin-bottom:4px">'+s.em+'</div>'
+      + '<div style="font-size:11px;font-weight:500;line-height:1.3;color:'+(s.isCustom&&!sel?'var(--s)':'var(--t)')+'">'+s.nm+'</div>'
+      + '</div>';
   });
-  tagHtml += '<input type="text" id="custom-symptom-input" placeholder="输入症状..." style="width:100px;padding:6px 10px;border-radius:20px;border:1.5px dashed var(--sep);font-size:13px;outline:none" onkeydown="if(event.key===\'Enter\')addCustomSymptom()"><button onclick="addCustomSymptom()" style="padding:6px 10px;border-radius:20px;border:none;background:var(--b);color:#fff;font-size:12px;cursor:pointer">＋</button>';
+  tagHtml += '</div>';
+  // custom symptom input
+  tagHtml += '<div style="display:flex;gap:6px;margin-top:10px"><input type="text" id="custom-symptom-input" placeholder="输入自定义症状..." style="flex:1;padding:8px 12px;border-radius:10px;border:1.5px dashed var(--sep);font-size:13px;outline:none" onkeydown="if(event.key===\'Enter\')addCustomSymptom()"><button onclick="addCustomSymptom()" style="padding:8px 16px;border-radius:10px;border:none;background:var(--b);color:#fff;font-size:13px;cursor:pointer;white-space:nowrap">＋ 添加</button></div>';
   document.getElementById('tcm-symptom-tags').innerHTML = tagHtml;
 
   const recEl = document.getElementById('tcm-recommendations');
@@ -494,6 +497,27 @@ function renderTCMLogTab() {
     h += '<button onclick="tcmLogDate=new Date();renderTCM()" style="display:block;margin:0 auto 10px;font-size:12px;color:var(--b);background:none;border:none;cursor:pointer">回到今天</button>';
   }
 
+  // ── Daily scoring ──
+  const score = tcmScores[logDateStr] || {};
+  const dims = [
+    {key:'energy', emoji:'⚡', label:'精力状态', opts:['😫 很累','😐 一般','🙂 尚可','💪 充沛','🔥 爆满']},
+    {key:'sleep', emoji:'🌙', label:'睡眠质量', opts:['😫 很差','😐 较差','🙂 一般','😊 不错','💤 极佳']},
+    {key:'mood', emoji:'💛', label:'心情情绪', opts:['😢 低落','😐 平淡','🙂 平静','😊 愉悦','🌟 超棒']},
+  ];
+  h += '<div class="card" style="padding:12px 14px;margin-bottom:10px"><div style="font-weight:600;font-size:13px;margin-bottom:10px">📊 今日状态评估</div>';
+  dims.forEach(d => {
+    const cur = score[d.key] || 0;
+    h += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px"><span style="font-size:14px;width:22px;text-align:center">'+d.emoji+'</span><span style="font-size:12px;width:56px;color:var(--s);flex-shrink:0">'+d.label+'</span><div style="display:flex;gap:3px;flex:1">';
+    for (let i = 1; i <= 5; i++) {
+      h += '<button onclick="setTCMScore(\''+d.key+'\','+i+')" style="flex:1;padding:5px 0;border-radius:6px;border:1.5px solid '+(cur===i?'var(--g)':'var(--sep)')+';background:'+(cur===i?'rgba(52,199,89,.12)':'#fff')+';font-size:11px;cursor:pointer;font-weight:'+(cur===i?'600':'400')+';color:'+(cur===i?'var(--g)':'var(--s)')+';transition:all .1s">'+i+'</button>';
+    }
+    h += '</div></div>';
+  });
+  // discomfort note
+  h += '<div style="display:flex;align-items:center;gap:6px;margin-top:4px"><span style="font-size:14px;width:22px;text-align:center">🤒</span><span style="font-size:12px;width:56px;color:var(--s);flex-shrink:0">今日不适</span><input type="text" id="tcm-discomfort-input" value="'+(score.discomfort||'')+'" placeholder="如：头疼、胃胀..." style="flex:1;padding:7px 10px;border-radius:6px;border:1.5px solid var(--sep);font-size:12px;outline:none" onchange="setTCMDiscomfort(this.value)"></div>';
+  h += '</div>';
+
+  // log entries
   if (todayLogs.length === 0) {
     h += '<div class="card" style="text-align:center;color:var(--s);padding:24px">'+(isToday?'今天还没有记录':'当天没有记录')+'<br>点击下方按钮快速记录</div>';
   } else {
@@ -547,6 +571,26 @@ function fmtDateCN(d) {
 // TCM Log functions (localStorage)
 function loadTCMLogs() {
   try { tcmLogs = JSON.parse(localStorage.getItem('tcm_logs')||'[]'); } catch(e) { tcmLogs = []; }
+  try { tcmScores = JSON.parse(localStorage.getItem('tcm_scores')||'{}'); } catch(e) { tcmScores = {}; }
+}
+function saveTCMLogs() {
+  localStorage.setItem('tcm_logs', JSON.stringify(tcmLogs));
+}
+function saveTCMScores() {
+  localStorage.setItem('tcm_scores', JSON.stringify(tcmScores));
+}
+function setTCMScore(key, val) {
+  const ds = ts(tcmLogDate);
+  if (!tcmScores[ds]) tcmScores[ds] = {};
+  tcmScores[ds][key] = val;
+  saveTCMScores();
+  renderTCM();
+}
+function setTCMDiscomfort(val) {
+  const ds = ts(tcmLogDate);
+  if (!tcmScores[ds]) tcmScores[ds] = {};
+  tcmScores[ds].discomfort = val.trim();
+  saveTCMScores();
 }
 function saveTCMLogs() {
   localStorage.setItem('tcm_logs', JSON.stringify(tcmLogs));
