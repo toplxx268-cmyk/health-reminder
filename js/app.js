@@ -520,22 +520,40 @@ function renderTCM() {
 
 // ─── AI Recommendation Engine ───
 function showAIKeyPrompt() {
-  const key = prompt('请输入 Gemini API Key（免费，手机/电脑通用）：\n\n🔑 免费获取：aistudio.google.com\n📋 点击「Get API Key」→ 复制粘贴到这里\n\n（如需使用 Groq/OpenAI，输入 g:你的Key）', tcmAIKey || '');
+  const key = prompt('请输入 AI API Key：\n\n🔹 Gemini → 免费，手机可用\n    获取：aistudio.google.com\n    格式：AIza...开头\n\n🔹 Groq → 免费，需Edge Function\n    格式：gsk_...开头\n\n🔹 DeepSeek → 送500万token\n    格式：sk-...开头', tcmAIKey || '');
   if (key !== null && key.trim()) {
     const k = key.trim();
-    if (k.startsWith('g:')) {
-      // Groq/OpenAI mode
-      tcmAIKey = k.slice(2).trim();
-      localStorage.setItem('tcm_aikey', tcmAIKey);
-      const ep = prompt('API 地址（默认 Groq）：', 'https://api.groq.com/openai/v1/chat/completions');
+    tcmAIKey = k;
+    localStorage.setItem('tcm_aikey', tcmAIKey);
+    // Auto-detect provider by key format
+    if (k.startsWith('AIza')) {
+      // Gemini key
+      localStorage.removeItem('tcm_aiendpoint');
+      showToast('✅ Gemini 已配置');
+    } else if (k.startsWith('gsk_')) {
+      // Groq key
+      localStorage.setItem('tcm_aiendpoint', 'https://api.groq.com/openai/v1/chat/completions');
+      showToast('✅ Groq 已配置（通过服务器中转）');
+    } else if (k.startsWith('sk-')) {
+      // DeepSeek or OpenAI — ask endpoint
+      const ep = prompt('API 地址：\n\nDeepSeek → https://api.deepseek.com/v1/chat/completions\n其他 → 输入完整地址', 'https://api.deepseek.com/v1/chat/completions');
       if (ep !== null && ep.trim()) localStorage.setItem('tcm_aiendpoint', ep.trim());
+      showToast('✅ API 已配置（通过服务器中转）');
     } else {
-      // Gemini mode (default)
-      tcmAIKey = k;
-      localStorage.setItem('tcm_aikey', tcmAIKey);
-      localStorage.removeItem('tcm_aiendpoint'); // use gemini default
+      // Unknown format — ask
+      const ep = prompt('无法识别 Key 类型，请选择 API：\n\n1 → Gemini（免费，直连）\n2 → Groq（免费，中转）\n3 → 自定义地址', '2');
+      if (ep === '1') {
+        localStorage.removeItem('tcm_aiendpoint');
+        showToast('✅ Gemini 已配置');
+      } else if (ep === '2') {
+        localStorage.setItem('tcm_aiendpoint', 'https://api.groq.com/openai/v1/chat/completions');
+        showToast('✅ Groq 已配置');
+      } else if (ep === '3') {
+        const custom = prompt('请输入完整 API 地址：', 'https://api.deepseek.com/v1/chat/completions');
+        if (custom !== null && custom.trim()) localStorage.setItem('tcm_aiendpoint', custom.trim());
+        showToast('✅ 自定义 API 已配置');
+      }
     }
-    showToast('✅ AI 已配置，点击「🤖 AI 智能推荐」');
     renderTCM();
   }
 }
@@ -829,6 +847,13 @@ function loadTCMLogs() {
   try { tcmScores = JSON.parse(localStorage.getItem('tcm_scores')||'{}'); } catch(e) { tcmScores = {}; }
   try { tcmAI = JSON.parse(localStorage.getItem('tcm_ai')||'{}'); } catch(e) { tcmAI = {}; }
   tcmAIKey = localStorage.getItem('tcm_aikey') || '';
+  // auto-fix: if key is non-Gemini but no endpoint set, default to Groq
+  if (tcmAIKey && !tcmAIKey.startsWith('AIza')) {
+    const ep = localStorage.getItem('tcm_aiendpoint');
+    if (!ep || ep === 'gemini') {
+      localStorage.setItem('tcm_aiendpoint', 'https://api.groq.com/openai/v1/chat/completions');
+    }
+  }
 }
 function saveTCMLogs() {
   localStorage.setItem('tcm_logs', JSON.stringify(tcmLogs));
