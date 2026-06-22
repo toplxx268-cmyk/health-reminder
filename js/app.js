@@ -339,7 +339,7 @@ function renderTCM() {
     '<button onclick="switchTCMTab(\'recommend\')" style="flex:1;padding:10px;border-radius:10px;border:none;font-size:14px;cursor:pointer;font-weight:600;background:'+(tcmTab==='recommend'?'var(--g)':'#E5E5EA')+';color:'+(tcmTab==='recommend'?'#fff':'var(--t)')+'">🩺 症状推荐</button>'+
     '<button onclick="switchTCMTab(\'log\')" style="flex:1;padding:10px;border-radius:10px;border:none;font-size:14px;cursor:pointer;font-weight:600;background:'+(tcmTab==='log'?'var(--g)':'#E5E5EA')+';color:'+(tcmTab==='log'?'#fff':'var(--t)')+'">📝 养生记录</button>'+
     '</div>';
-  document.getElementById('tcm-tab-bar').innerHTML = tabBar;
+  document.getElementById('tcm-tab-bar').innerHTML = '<div style="margin-bottom:12px">' + tabBar + '</div>';
 
   // hide symptom tags (and inline AI bar) in log mode
   document.getElementById('tcm-symptom-tags').style.display = tcmTab==='log' ? 'none' : '';
@@ -1539,7 +1539,7 @@ function renderStatContent() {
     // completions
     html += '<div style="margin-bottom:6px"><span style="font-weight:500">✅ 打卡：</span>'+(dayComps.length>0?dayComps.map(c=>{const r=reminders.find(x=>x.id===c.reminder_id);return emoji(r?r.type:'')+' '+(r?r.title:'');}).join(' · '):'<span style="color:var(--s)">无</span>')+'</div>';
     // diet
-    html += '<div style="margin-bottom:6px"><span style="font-weight:500">🥗 饮食覆盖率：</span>'+(dayCov.size>0?Math.round(dayCov.size/FG_DAILY.length*100)+'%（'+[...dayCov].map(g=>FG[g]?FG[g].em+'':'').join(' ')+')':'<span style="color:var(--s)">无记录</span>')+'</div>';
+    html += '<div style="margin-bottom:6px"><span style="font-weight:500">🥗 饮食覆盖数：</span>'+(dayCov.size>0?dayCov.size+'/'+FG_DAILY.length+' 类（'+[...dayCov].map(g=>FG[g]?FG[g].em+'':'').join(' ')+')':'<span style="color:var(--s)">无记录</span>')+'</div>';
     // tcm
     const tcmScoreParts = [];
     if (tcmDayScore.energy) tcmScoreParts.push('⚡'+tcmDayScore.energy);
@@ -1556,7 +1556,7 @@ function renderStatContent() {
   const totalDays = Math.max(1, (new Date(maxDate)-new Date(minDate))/86400000+1);
   const daysWithComps = new Set(comps.map(c=>c.date)).size;
   const totalComps = comps.length;
-  const avgDiet = Math.round(Object.values(dailyDietCov).reduce((s,v)=>s+v.size/dietTotal,0)/Math.max(1,Object.keys(dailyDietCov).length)*100);
+  const avgDietCount = (Object.values(dailyDietCov).reduce((s,v)=>s+v.size,0)/Math.max(1,Object.keys(dailyDietCov).length)).toFixed(1);
 
   // Week boundary header
   let periodTitle = statMode==='week'?'本周':statMode==='month'?'本月':'今年';
@@ -1569,8 +1569,7 @@ function renderStatContent() {
   html += '<div style="background:#F2F2F7;border-radius:10px;padding:10px"><div style="font-size:22px;font-weight:700;color:var(--g)">'+daysWithComps+'/'+Math.round(totalDays)+'</div><div style="font-size:11px;color:var(--s)">打卡天数</div></div>';
   html += '<div style="background:#F2F2F7;border-radius:10px;padding:10px"><div style="font-size:22px;font-weight:700;color:var(--g)">'+totalComps+'</div><div style="font-size:11px;color:var(--s)">完成次数</div></div>';
   html += '<div style="background:#F2F2F7;border-radius:10px;padding:10px"><div style="font-size:22px;font-weight:700;color:var(--b)">'+(totalComps/Math.max(1,totalDays)).toFixed(1)+'</div><div style="font-size:11px;color:var(--s)">日均完成</div></div>';
-  // diet coverage bar chart
-  html += '<div style="background:#F2F2F7;border-radius:10px;padding:10px"><div style="font-size:22px;font-weight:700;color:var(--b)">'+avgDiet+'%</div><div style="font-size:11px;color:var(--s);margin-bottom:4px">饮食覆盖率</div><div class="bar" style="height:6px"><div class="bar-f" style="width:'+avgDiet+'%;background:var(--b)"></div></div></div>';
+  html += '<div style="background:#F2F2F7;border-radius:10px;padding:10px"><div style="font-size:22px;font-weight:700;color:var(--b)">'+avgDietCount+'</div><div style="font-size:11px;color:var(--s)">均饮食覆盖/天</div></div>';
   html += '</div></div>';
 
   // Top reminders
