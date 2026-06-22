@@ -1621,17 +1621,20 @@ const FG_ALL = Object.keys(FG);
 // Diet frameworks — each maps to the 9 FG categories
 const DIETS = {
   modern: {
-    name:'MODERN饮食', em:'💪', desc:'必吃+适量+忌口，精准量化',
-    daily: ['oliveOil','leafyGreens','berries'],
-    weekly: ['eggs','poultry','rootVeg'],
+    name:'MODERN饮食', em:'💪', desc:'9类精准量化',
+    daily: ['oliveOil','vegetables','fruits','wholeGrains','nuts'],
+    weekly: ['fish','legumes','poultryEggs','dairy'],
     limited: ['sweets'],
     fq: {
       oliveOil:'每天 >10g · 必吃',
-      leafyGreens:'每天 1–1.5 份',
-      berries:'每天 1–2 份',
-      eggs:'每天 0.5–1 个',
-      poultry:'每天 ≤0.5 份',
-      rootVeg:'≤0.75 份/天',
+      vegetables:'绿叶菜为主 每天 1–1.5 份',
+      fruits:'浆果+柑橘 每天 1–2 份',
+      wholeGrains:'每天 3–5 份',
+      nuts:'每天 1 小把',
+      fish:'每周 ≥2 次',
+      legumes:'每周 2–3 次',
+      poultryEggs:'鸡蛋 0.5–1个/天 · 禽肉 ≤0.5份/天',
+      dairy:'适量 · 低脂奶制品',
       sweets:'含糖饮料 · 完全不喝',
     },
   },
@@ -1741,6 +1744,10 @@ function classifyFood(text) {
   for (const [kw, fg] of sorted) {
     if (t.includes(kw) && !found.has(fg)) {
       found.add(fg);
+      // also add parent category for MODERN-specific keys
+      if (fg==='leafyGreens'||fg==='rootVeg') found.add('vegetables');
+      if (fg==='berries') found.add('fruits');
+      if (fg==='eggs'||fg==='poultry') found.add('poultryEggs');
     }
   }
   return Array.from(found);
