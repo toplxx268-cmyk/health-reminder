@@ -201,8 +201,8 @@ function renderDash() {
       if (tgtDate) {
         const tgt = new Date(tgtDate);
         const daysLeft = Math.ceil((tgt - new Date()) / 86400000);
-        if (daysLeft > 0) cdHtml = `<span style="font-size:11px;color:var(--o);margin-left:6px">⏳ 还有${daysLeft}天</span>`;
-        else if (daysLeft === 0) cdHtml = `<span style="font-size:11px;color:var(--r);margin-left:6px">📌 今天截止</span>`;
+        if (daysLeft > 0) cdHtml = `<span style="font-size:14px;font-weight:700;color:var(--o);margin-left:6px">⏳ ${daysLeft}天</span>`;
+        else if (daysLeft === 0) cdHtml = `<span style="font-size:14px;font-weight:700;color:var(--r);margin-left:6px">📌 今天</span>`;
       }
       html += `<div class="tblock" onclick="openEdit('${r.id}')" style="cursor:pointer"><div class="ind"></div><div style="flex:1"><div${isDone?' style="text-decoration:line-through;color:var(--s)"':''}>📝 ${r.title}${cdHtml}</div><div style="font-size:12px;color:var(--s)">${tgtDate?tgtDate+' ':''}${s} – ${e}</div></div>`
         +`<div style="flex-shrink:0">`
@@ -340,9 +340,8 @@ function renderTCM() {
     '<button onclick="switchTCMTab(\'log\')" style="flex:1;padding:10px;border-radius:10px;border:none;font-size:14px;cursor:pointer;font-weight:600;background:'+(tcmTab==='log'?'var(--g)':'#E5E5EA')+';color:'+(tcmTab==='log'?'#fff':'var(--t)')+'">📝 养生记录</button>'+
     '</div>';
 
-  // hide symptom tags and ai bar in log mode
+  // hide symptom tags (and inline AI bar) in log mode
   document.getElementById('tcm-symptom-tags').style.display = tcmTab==='log' ? 'none' : '';
-  document.getElementById('tcm-ai-bar').style.display = tcmTab==='log' ? 'none' : '';
 
   if (tcmTab === 'log') {
     document.getElementById('tcm-recommendations').innerHTML = tabBar + renderTCMLogTab();
@@ -367,7 +366,10 @@ function renderTCM() {
     tagHtml += '<button onclick="toggleSymptom(\''+s.id+'\')" style="display:inline-flex;align-items:center;padding:6px 10px;border-radius:20px;'+st+';font-size:13px;cursor:pointer;white-space:nowrap">'+s.em+' '+s.nm+(sel?' ✓':'')+delBtn+'</button>';
   });
   tagHtml += '</div>';
-  tagHtml += '<div style="display:flex;gap:6px;margin-bottom:12px"><input type="text" id="custom-symptom-input" placeholder="输入症状..." style="flex:1;padding:8px 12px;border-radius:20px;border:1.5px dashed var(--sep);font-size:13px;outline:none" onkeydown="if(event.key===\'Enter\')addCustomSymptom()"><button onclick="addCustomSymptom()" style="padding:8px 16px;border-radius:20px;border:none;background:var(--b);color:#fff;font-size:13px;cursor:pointer;white-space:nowrap">＋</button></div>';
+  tagHtml += '<div style="display:flex;gap:6px;margin-bottom:8px"><input type="text" id="custom-symptom-input" placeholder="输入症状..." style="flex:1;padding:8px 12px;border-radius:20px;border:1.5px dashed var(--sep);font-size:13px;outline:none" onkeydown="if(event.key===\'Enter\')addCustomSymptom()"><button onclick="addCustomSymptom()" style="padding:8px 16px;border-radius:20px;border:none;background:var(--b);color:#fff;font-size:13px;cursor:pointer;white-space:nowrap">＋</button></div>';
+  // AI bar placeholder — rendered inline below the input
+  tagHtml += '<div id="tcm-ai-bar-inline"></div>';
+  document.getElementById('tcm-symptom-tags').innerHTML = tagHtml;
 
   const recEl = document.getElementById('tcm-recommendations');
   if (tcmSelected.size === 0) {
@@ -444,8 +446,8 @@ function renderTCM() {
       aiBarHtml = '<button onclick="refreshAI()" style="display:block;width:100%;padding:6px;border-radius:8px;border:1px solid var(--sep);background:#fff;color:var(--s);font-size:11px;cursor:pointer">🔄 重新AI分析</button>';
     }
   }
-  document.getElementById('tcm-ai-bar').innerHTML = aiBarHtml;
-  document.getElementById('tcm-ai-bar').style.display = aiBarHtml ? '' : 'none';
+  const aiEl = document.getElementById('tcm-ai-bar-inline');
+  if (aiEl) { aiEl.innerHTML = aiBarHtml; aiEl.style.display = aiBarHtml ? '' : 'none'; }
 
   // show AI analysis for cached symptoms
   if (allCached) {
@@ -1200,16 +1202,19 @@ function aiClassify() {
     result.innerHTML = '<span style="color:var(--o)">未识别到食物，请手动选择下方分类</span>';
     return;
   }
-  // auto-select matched groups
+  // auto-select matched groups + fill notes with input text
   matched.forEach(k => logGroups.add(k));
+  logNotes = input.value;
   renderLogForm();
   // show result summary
   const names = matched.map(k => FG[k].em + FG[k].nm).join('、');
   result.innerHTML = `<span style="color:var(--g)">✅ 识别到：${names}</span>`;
-  // restore input value after re-render
+  // restore input value + notes after re-render
   setTimeout(() => {
     const inp = document.getElementById('ai-food-input');
     if (inp) inp.value = input.value;
+    const ta = document.querySelector('#meal-body textarea');
+    if (ta) ta.value = logNotes;
   }, 50);
 }
 
@@ -1463,12 +1468,12 @@ function renderStatContent() {
       const hasComp = dailyCompCount[ds] && dailyCompCount[ds]>0;
       const isToday = ds===ts();
       const isSel = ds===statSelectedDate;
-      let bg = '#fff', clr = 'var(--t)';
+      let bg = '#fff', clr = '#1C1C1E';
       if (hasDiet && hasComp) bg = 'rgba(52,199,89,.15)';
       else if (hasDiet) bg = 'rgba(0,122,255,.08)';
       else if (hasComp) bg = 'rgba(255,149,0,.08)';
-      if (isToday) bg = 'var(--g)'; clr = '#fff';
-      if (isSel) { bg = 'var(--p)'; clr = '#fff'; }
+      if (isToday) { bg = '#34C759'; clr = '#fff'; }
+      if (isSel) { bg = '#AF52DE'; clr = '#fff'; }
       cal += '<div onclick="statSelectedDate=\''+ds+'\';renderStatContent()" style="padding:4px 2px;border-radius:6px;background:'+bg+';color:'+clr+';font-size:'+(isToday||isSel?'13px':'12px')+';font-weight:'+(isToday||isSel?'600':'400')+';cursor:pointer">'+d+'</div>';
     }
     cal += '</div></div>';
@@ -1510,12 +1515,19 @@ function renderStatContent() {
   const totalComps = comps.length;
   const avgDiet = Math.round(Object.values(dailyDietCov).reduce((s,v)=>s+v.size/dietTotal,0)/Math.max(1,Object.keys(dailyDietCov).length)*100);
 
-  html += '<div class="card" style="margin-bottom:10px"><div style="font-weight:600;margin-bottom:10px">📊 '+(statMode==='week'?'本周':statMode==='month'?'本月':'今年')+'概览</div>';
+  // Week boundary header
+  let periodTitle = statMode==='week'?'本周':statMode==='month'?'本月':'今年';
+  if (statMode==='week') {
+    periodTitle += '（'+minDate+' ~ '+maxDate+'）';
+  }
+
+  html += '<div class="card" style="margin-bottom:10px"><div style="font-weight:600;margin-bottom:10px">📊 '+periodTitle+'概览</div>';
   html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;text-align:center">';
   html += '<div style="background:#F2F2F7;border-radius:10px;padding:10px"><div style="font-size:22px;font-weight:700;color:var(--g)">'+daysWithComps+'/'+Math.round(totalDays)+'</div><div style="font-size:11px;color:var(--s)">打卡天数</div></div>';
   html += '<div style="background:#F2F2F7;border-radius:10px;padding:10px"><div style="font-size:22px;font-weight:700;color:var(--g)">'+totalComps+'</div><div style="font-size:11px;color:var(--s)">完成次数</div></div>';
   html += '<div style="background:#F2F2F7;border-radius:10px;padding:10px"><div style="font-size:22px;font-weight:700;color:var(--b)">'+(totalComps/Math.max(1,totalDays)).toFixed(1)+'</div><div style="font-size:11px;color:var(--s)">日均完成</div></div>';
-  html += '<div style="background:#F2F2F7;border-radius:10px;padding:10px"><div style="font-size:22px;font-weight:700;color:var(--b)">'+avgDiet+'%</div><div style="font-size:11px;color:var(--s)">饮食覆盖率</div></div>';
+  // diet coverage bar chart
+  html += '<div style="background:#F2F2F7;border-radius:10px;padding:10px"><div style="font-size:22px;font-weight:700;color:var(--b)">'+avgDiet+'%</div><div style="font-size:11px;color:var(--s);margin-bottom:4px">饮食覆盖率</div><div class="bar" style="height:6px"><div class="bar-f" style="width:'+avgDiet+'%;background:var(--b)"></div></div></div>';
   html += '</div></div>';
 
   // Top reminders
