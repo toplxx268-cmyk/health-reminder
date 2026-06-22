@@ -319,7 +319,9 @@ function renderTCM() {
     const st = s.isCustom
       ? 'border:1.5px solid '+(sel?'var(--b)':'var(--sep)')+';background:'+(sel?'rgba(0,122,255,.1)':'#fff')+';color:'+(sel?'var(--b)':'var(--t)')
       : 'border:1.5px solid '+(sel?'var(--g)':'var(--sep)')+';background:'+(sel?'rgba(52,199,89,.12)':'#fff');
-    tagHtml += '<button onclick="toggleSymptom(\''+s.id+'\')" style="padding:6px 12px;border-radius:20px;'+st+';font-size:13px;cursor:pointer;white-space:nowrap">'+s.em+' '+s.nm+(sel?' ✓':'')+'</button>';
+    const delBtn = sel ? '<button onclick="event.stopPropagation();removeSymptom(\''+s.id+'\')" style="padding:4px 7px;border-radius:0 20px 20px 0;border:1.5px solid var(--r);border-left:none;background:#fff;color:var(--r);font-size:11px;cursor:pointer;font-weight:700" title="移除">✕</button>' : '';
+    const radius = delBtn ? 'border-radius:20px 0 0 20px;' : 'border-radius:20px;';
+    tagHtml += '<span style="display:inline-flex;align-items:center">'+'<button onclick="toggleSymptom(\''+s.id+'\')" style="padding:6px 10px;'+radius+st+';font-size:13px;cursor:pointer;white-space:nowrap">'+s.em+' '+s.nm+(sel?' ✓':'')+'</button>'+delBtn+'</span>';
   });
   tagHtml += '<input type="text" id="custom-symptom-input" placeholder="输入症状..." style="width:100px;padding:6px 10px;border-radius:20px;border:1.5px dashed var(--sep);font-size:13px;outline:none" onkeydown="if(event.key===\'Enter\')addCustomSymptom()"><button onclick="addCustomSymptom()" style="padding:6px 10px;border-radius:20px;border:none;background:var(--b);color:#fff;font-size:12px;cursor:pointer">＋</button>';
   document.getElementById('tcm-symptom-tags').innerHTML = tagHtml;
@@ -436,6 +438,16 @@ function switchTCMTab(tab) {
 function toggleSymptom(id) {
   if (tcmSelected.has(id)) tcmSelected.delete(id);
   else tcmSelected.add(id);
+  renderTCM();
+}
+
+function removeSymptom(id) {
+  tcmSelected.delete(id);
+  if (id.startsWith('cust_')) delete tcmCustomMap[id];
+  // also remove orphaned custom entries not in tcmSelected
+  Object.keys(tcmCustomMap).forEach(k => {
+    if (!tcmSelected.has(k)) delete tcmCustomMap[k];
+  });
   renderTCM();
 }
 
