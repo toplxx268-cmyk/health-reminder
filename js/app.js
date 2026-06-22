@@ -538,17 +538,32 @@ async function callTCMAI() {
 症状：${uncached.join('、')}`;
 
   try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 30000);
     const res = await fetch(endpoint, {
       method: 'POST',
+      mode: 'cors',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tcmAIKey },
-      body: JSON.stringify({ model, messages: [{role:'user',content:prompt}], max_tokens: 2048, temperature: 0.7 })
+      body: JSON.stringify({ model, messages: [{role:'user',content:prompt}], max_tokens: 2048, temperature: 0.7 }),
+      signal: controller.signal
     });
-    if (!res.ok) throw new Error('API error ' + res.status);
+    clearTimeout(timer);
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      throw new Error('HTTP '+res.status+(errText?' — '+errText.slice(0,80):''));
+    }
     const data = await res.json();
     let text = data.choices?.[0]?.message?.content || '';
+    if (!text) throw new Error('API 返回为空，请检查 Key 是否正确');
     // strip markdown fences
     text = text.replace(/```json\n?/gi, '').replace(/```\n?/g, '').trim();
-    const parsed = JSON.parse(text);
+    let parsed;
+    try { parsed = JSON.parse(text); } catch(e) {
+      // try to extract JSON from mixed content
+      const m = text.match(/\{[\s\S]*\}/);
+      if (m) parsed = JSON.parse(m[0]);
+      else throw new Error('AI 返回格式异常，请重试');
+    }
     // cache results for all queried symptoms
     uncached.forEach(name => {
       tcmAI[name] = {
@@ -562,10 +577,18 @@ async function callTCMAI() {
     showToast('✅ AI 推荐已生成');
     renderTCM();
   } catch(e) {
-    showToast('❌ AI 请求失败: ' + (e.message||'未知错误'));
+    let msg = e.message || '未知错误';
+    if (msg === 'Failed to fetch' || msg.includes('NetworkError')) {
+      msg = '网络不通 — 手机端请检查：\n① 关闭 Safari 的「阻止跨站跟踪」\n② 切换 WiFi 试试\n③ 检查 Key 是否正确';
+    } else if (msg.includes('abort') || msg.includes('AbortError')) {
+      msg = '请求超时，请检查网络后重试';
+    }
+    showToast('❌ ' + msg);
     console.error('TCM AI error:', e);
   } finally {
     tcmAILoading = false;
+    const btn = document.getElementById('tcm-ai-btn');
+    if (btn) { btn.textContent = '🤖 AI 智能推荐'; btn.disabled = false; }
   }
 }
 
