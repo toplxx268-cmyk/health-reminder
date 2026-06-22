@@ -402,6 +402,34 @@ function renderTCM() {
     }
   });
 
+  // ── AI analysis panel (above cards) ──
+  const hasCustom = Array.from(tcmSelected).some(id => id.startsWith('cust_'));
+  const customNames = hasCustom ? Array.from(tcmSelected).filter(id => id.startsWith('cust_')).map(id => tcmCustomMap[id]).filter(Boolean) : [];
+  const allCached = hasCustom && customNames.length > 0 && customNames.every(n => tcmAI[n] && tcmAI[n].analysis);
+
+  if (hasCustom) {
+    if (!allCached && tcmAIKey) {
+      html += '<button onclick="callTCMAI()" id="tcm-ai-btn" style="display:block;width:100%;padding:12px;margin-bottom:12px;border-radius:12px;border:1.5px dashed var(--p);background:rgba(175,82,222,.04);color:var(--p);font-size:14px;font-weight:600;cursor:pointer"'+(tcmAILoading?' disabled':'')+'>'+(tcmAILoading?'⏳ AI分析中...':'🤖 AI 智能推荐')+'</button>';
+    } else if (!tcmAIKey) {
+      html += '<button onclick="showAIKeyPrompt()" style="display:block;width:100%;padding:12px;margin-bottom:12px;border-radius:12px;border:1.5px dashed var(--sep);background:#F9F9F9;color:var(--s);font-size:14px;cursor:pointer">🤖 AI 智能推荐 <span style="font-size:11px;opacity:.7">（需配置API Key）</span></button>';
+    }
+  }
+
+  // show AI analysis for cached symptoms
+  if (allCached) {
+    customNames.forEach(name => {
+      const ai = tcmAI[name];
+      if (!ai || !ai.analysis) return;
+      html += '<div class="card" style="margin-bottom:12px;border-left:3px solid var(--p);position:relative">';
+      html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><span style="font-weight:600;font-size:14px;color:var(--p)">🤖 AI分析建议</span><span style="font-size:11px;color:var(--s)">针对：'+name+'</span></div>';
+      html += '<div style="font-size:13px;line-height:1.7;color:var(--t)">'+ai.analysis+'</div>';
+      html += '<button onclick="clearAISymptom(\''+name+'\')" style="position:absolute;top:8px;right:8px;background:none;border:none;font-size:14px;color:var(--s);cursor:pointer;opacity:.4">✕</button>';
+      html += '</div>';
+    });
+    // re-fetch button
+    html += '<button onclick="refreshAI()" style="display:block;width:100%;padding:8px;margin-bottom:12px;border-radius:10px;border:1px solid var(--sep);background:#fff;color:var(--s);font-size:12px;cursor:pointer">🔄 重新AI分析</button>';
+  }
+
   // === Food recommendations — 3-col cards ===
   html += '<div class="st">🥗 中医食疗推荐</div>';
   const foodList = Object.values(foods).slice(0, 9);
@@ -427,7 +455,6 @@ function renderTCM() {
   if (blendList.length === 0 && teaList.length === 0) html += '<div class="card" style="color:var(--s);text-align:center">暂无匹配茶饮</div>';
   else {
     html += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:6px">';
-    // blends first
     blendList.forEach(b => {
       html += '<div style="background:var(--card);border-radius:12px;padding:10px 8px;text-align:center;border-left:3px solid var(--p)">'
         +'<div style="font-size:20px;margin-bottom:2px">🍵</div>'
@@ -438,7 +465,6 @@ function renderTCM() {
         +'<div style="font-size:10px;color:var(--o);margin-top:2px;line-height:1.3">⚠️ '+b.caution+'</div>'
         +'</div>';
     });
-    // single teas
     teaList.forEach(t => {
       html += '<div style="background:var(--card);border-radius:12px;padding:10px 8px;text-align:center;border-left:3px solid var(--b)">'
         +'<div style="font-size:20px;margin-bottom:2px">🍵</div>'
@@ -467,18 +493,6 @@ function renderTCM() {
         +'</div>';
     });
     html += '</div>';
-  }
-
-  // AI recommendation button for custom symptoms
-  const hasCustom = Array.from(tcmSelected).some(id => id.startsWith('cust_'));
-  if (hasCustom) {
-    const customNames = Array.from(tcmSelected).filter(id => id.startsWith('cust_')).map(id => tcmCustomMap[id]).filter(Boolean);
-    const allCached = customNames.every(n => tcmAI[n]);
-    if (!allCached && tcmAIKey) {
-      html += '<button onclick="callTCMAI()" id="tcm-ai-btn" style="display:block;width:100%;padding:12px;margin-top:12px;border-radius:12px;border:1.5px dashed var(--p);background:rgba(175,82,222,.04);color:var(--p);font-size:14px;font-weight:600;cursor:pointer"'+(tcmAILoading?' disabled':'')+'>'+(tcmAILoading?'⏳ AI分析中...':'🤖 AI 智能推荐')+'</button>';
-    } else if (!tcmAIKey) {
-      html += '<button onclick="showAIKeyPrompt()" style="display:block;width:100%;padding:12px;margin-top:12px;border-radius:12px;border:1.5px dashed var(--sep);background:#F9F9F9;color:var(--s);font-size:14px;cursor:pointer">🤖 AI 智能推荐 <span style="font-size:11px;opacity:.7">（需配置API Key）</span></button>';
-    }
   }
 
   recEl.innerHTML = html;
@@ -512,10 +526,11 @@ async function callTCMAI() {
   const endpoint = localStorage.getItem('tcm_aiendpoint') || 'https://api.groq.com/openai/v1/chat/completions';
   const model = endpoint.includes('groq') ? 'llama-3.3-70b-versatile' : 'gpt-4o-mini';
 
-  const prompt = `你是中医养生专家。请针对以下症状，推荐中医食疗、茶饮和穴位按摩方案。严格按JSON格式输出，不要markdown代码块：
+  const prompt = `你是中医养生专家。请针对以下症状给出中医分析及推荐。严格按JSON格式输出，不要markdown代码块：
 {
-  "foods": [{"food":"食物名","nature":"性味（如温/寒/平）","action":"功效","note":"用法"}],
-  "teas": [{"key":"茶名拼音","name":"茶名","nature":"性味","effects":["功效1","功效2"],"caution":"注意事项"}],
+  "analysis": "中医辨证分析（150字内，说明症状所属证型、病位、病机，给出调理原则）",
+  "foods": [{"food":"食物名","nature":"性味","action":"功效","note":"用法"}],
+  "teas": [{"key":"拼音","name":"茶名","nature":"性味","effects":["功效"],"caution":"注意"}],
   "points": [{"point":"穴位名","meridian":"经络","loc":"位置","tech":"手法"}]
 }
 症状：${uncached.join('、')}`;
@@ -535,6 +550,7 @@ async function callTCMAI() {
     // cache results for all queried symptoms
     uncached.forEach(name => {
       tcmAI[name] = {
+        analysis: parsed.analysis || '',
         foods: (parsed.foods||[]).slice(0, 6),
         teas: (parsed.teas||[]).slice(0, 4),
         points: (parsed.points||[]).slice(0, 4),
@@ -549,6 +565,18 @@ async function callTCMAI() {
   } finally {
     tcmAILoading = false;
   }
+}
+
+function clearAISymptom(name) {
+  delete tcmAI[name];
+  try { localStorage.setItem('tcm_ai', JSON.stringify(tcmAI)); } catch(e) {}
+  renderTCM();
+}
+function refreshAI() {
+  const customNames = Array.from(tcmSelected).filter(id => id.startsWith('cust_')).map(id => tcmCustomMap[id]).filter(Boolean);
+  customNames.forEach(n => { delete tcmAI[n]; });
+  try { localStorage.setItem('tcm_ai', JSON.stringify(tcmAI)); } catch(e) {}
+  if (tcmAIKey) { callTCMAI(); } else { renderTCM(); }
 }
 
 // Enhanced tokenizer for custom symptoms: breaks into characters + 2-char substrings
