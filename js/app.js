@@ -319,7 +319,7 @@ function renderTCM() {
     const st = s.isCustom
       ? 'border:1.5px solid '+(sel?'var(--b)':'var(--sep)')+';background:'+(sel?'rgba(0,122,255,.1)':'#fff')+';color:'+(sel?'var(--b)':'var(--t)')
       : 'border:1.5px solid '+(sel?'var(--g)':'var(--sep)')+';background:'+(sel?'rgba(52,199,89,.12)':'#fff');
-    const delBtn = sel ? '<button onclick="event.stopPropagation();removeSymptom(\''+s.id+'\')" style="padding:4px 7px;border-radius:0 20px 20px 0;border:1.5px solid var(--r);border-left:none;background:#fff;color:var(--r);font-size:11px;cursor:pointer;font-weight:700" title="移除">✕</button>' : '';
+    const delBtn = (sel || s.isCustom) ? '<button onclick="event.stopPropagation();removeSymptom(\''+s.id+'\')" style="padding:4px 7px;border-radius:0 20px 20px 0;border:1.5px solid var(--r);border-left:none;background:#fff;color:var(--r);font-size:11px;cursor:pointer;font-weight:700" title="移除">✕</button>' : '';
     const radius = delBtn ? 'border-radius:20px 0 0 20px;' : 'border-radius:20px;';
     tagHtml += '<span style="display:inline-flex;align-items:center">'+'<button onclick="toggleSymptom(\''+s.id+'\')" style="padding:6px 10px;'+radius+st+';font-size:13px;cursor:pointer;white-space:nowrap">'+s.em+' '+s.nm+(sel?' ✓':'')+'</button>'+delBtn+'</span>';
   });
