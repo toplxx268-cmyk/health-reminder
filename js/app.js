@@ -319,25 +319,23 @@ function renderTCM() {
   }
 
   // === RECOMMEND TAB ===
-  let tagHtml = '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">';
+  let tagHtml = '<div style="display:flex;flex-wrap:wrap;gap:6px">';
   const allEntries = [
     ...TCM_SYMPTOMS.map(s => ({id:s.id, nm:s.nm, em:s.catEm, isCustom:false})),
     ...Object.entries(tcmCustomMap).map(([id, nm]) => ({id, nm, em:'✏️', isCustom:true}))
   ];
   allEntries.forEach(s => {
     const sel = tcmSelected.has(s.id);
-    const borderClr = s.isCustom ? (sel ? 'var(--b)' : 'var(--sep)') : (sel ? 'var(--g)' : 'var(--sep)');
-    const bg = s.isCustom ? (sel ? 'rgba(0,122,255,.08)' : '#fff') : (sel ? 'rgba(52,199,89,.08)' : '#fff');
-    tagHtml += '<div onclick="toggleSymptom(\''+s.id+'\')" style="position:relative;background:'+bg+';border:1.5px solid '+borderClr+';border-radius:12px;padding:12px 6px 8px;text-align:center;cursor:pointer;transition:all .15s;-webkit-tap-highlight-color:transparent">'
-      + (sel ? '<span style="position:absolute;top:4px;right:6px;font-size:10px;color:var(--g)">✓</span>' : '')
-      + ((sel||s.isCustom) ? '<span onclick="event.stopPropagation();removeSymptom(\''+s.id+'\')" style="position:absolute;top:4px;right:'+(sel?'18px':'4px')+';width:16px;height:16px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:9px;color:var(--s);background:rgba(0,0,0,.06);cursor:pointer" onmouseover="this.style.background=\'rgba(255,59,48,.15)\';this.style.color=\'var(--r)\'" onmouseout="this.style.background=\'rgba(0,0,0,.06)\';this.style.color=\'var(--s)\'">✕</span>' : '')
-      + '<div style="font-size:26px;margin-bottom:4px">'+s.em+'</div>'
-      + '<div style="font-size:11px;font-weight:500;line-height:1.3;color:'+(s.isCustom&&!sel?'var(--s)':'var(--t)')+'">'+s.nm+'</div>'
-      + '</div>';
+    const st = s.isCustom
+      ? 'border:1.5px solid '+(sel?'var(--b)':'var(--sep)')+';background:'+(sel?'rgba(0,122,255,.1)':'#fff')+';color:'+(sel?'var(--b)':'var(--t)')
+      : 'border:1.5px solid '+(sel?'var(--g)':'var(--sep)')+';background:'+(sel?'rgba(52,199,89,.12)':'#fff');
+    const delBtn = (sel || s.isCustom)
+      ? '<span onclick="event.stopPropagation();removeSymptom(\''+s.id+'\')" style="display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;margin-left:2px;margin-right:-2px;border-radius:50%;background:rgba(0,0,0,.08);color:var(--s);font-size:10px;line-height:1;cursor:pointer;transition:all .15s" onmouseover="this.style.background=\'rgba(255,59,48,.15)\';this.style.color=\'var(--r)\'" onmouseout="this.style.background=\'rgba(0,0,0,.08)\';this.style.color=\'var(--s)\'">✕</span>'
+      : '';
+    tagHtml += '<button onclick="toggleSymptom(\''+s.id+'\')" style="display:inline-flex;align-items:center;padding:6px 10px;border-radius:20px;'+st+';font-size:13px;cursor:pointer;white-space:nowrap">'+s.em+' '+s.nm+(sel?' ✓':'')+delBtn+'</button>';
   });
   tagHtml += '</div>';
-  // custom symptom input
-  tagHtml += '<div style="display:flex;gap:6px;margin-top:10px"><input type="text" id="custom-symptom-input" placeholder="输入自定义症状..." style="flex:1;padding:8px 12px;border-radius:10px;border:1.5px dashed var(--sep);font-size:13px;outline:none" onkeydown="if(event.key===\'Enter\')addCustomSymptom()"><button onclick="addCustomSymptom()" style="padding:8px 16px;border-radius:10px;border:none;background:var(--b);color:#fff;font-size:13px;cursor:pointer;white-space:nowrap">＋ 添加</button></div>';
+  tagHtml += '<div style="display:flex;gap:6px;margin-top:8px"><input type="text" id="custom-symptom-input" placeholder="输入症状..." style="flex:1;padding:8px 12px;border-radius:20px;border:1.5px dashed var(--sep);font-size:13px;outline:none" onkeydown="if(event.key===\'Enter\')addCustomSymptom()"><button onclick="addCustomSymptom()" style="padding:8px 16px;border-radius:20px;border:none;background:var(--b);color:#fff;font-size:13px;cursor:pointer;white-space:nowrap">＋</button></div>';
   document.getElementById('tcm-symptom-tags').innerHTML = tagHtml;
 
   const recEl = document.getElementById('tcm-recommendations');
@@ -392,32 +390,72 @@ function renderTCM() {
     });
   });
 
+  // === Food recommendations — 3-col cards ===
   html += '<div class="st">🥗 中医食疗推荐</div>';
-  const foodList = Object.values(foods).slice(0, 8);
+  const foodList = Object.values(foods).slice(0, 9);
   if (foodList.length === 0) html += '<div class="card" style="color:var(--s);text-align:center">暂无匹配的食疗方案</div>';
-  else foodList.forEach(f => {
-    html += '<div class="tcm-item"><div class="tcm-food">🌿 '+f.food+' <span style="font-size:11px;background:rgba(0,0,0,.06);padding:1px 6px;border-radius:10px;margin-left:6px">性'+f.nature+'</span></div><div style="font-size:13px;color:var(--g);font-weight:500;margin-bottom:2px">'+f.action+'</div><div style="font-size:12px;color:var(--s)">'+f.note+'</div></div>';
-  });
-
-  html += '<div class="st">🍵 茶饮推荐</div>';
-  const blendList = Object.values(blends).slice(0, 4);
-  const teaList = Object.values(teas).slice(0, 4);
-  if (blendList.length === 0 && teaList.length === 0) html += '<div class="card" style="color:var(--s);text-align:center">暂无匹配茶饮</div>';
   else {
-    blendList.forEach(b => {
-      html += '<div class="tcm-item"><div class="tcm-food">🍵 '+b.name+' <span style="font-size:10px;background:rgba(175,82,222,.1);color:var(--p);padding:1px 6px;border-radius:10px;margin-left:4px">搭配</span><span style="font-size:11px;background:rgba(0,0,0,.06);padding:1px 6px;border-radius:10px;margin-left:4px">性'+b.nature+'</span></div><div style="font-size:12px;color:var(--s);margin-bottom:2px">配方：'+b.ingredients.join('+')+' · '+b.recipe+'</div><div style="font-size:12px;color:var(--g)">✅ '+b.for+'</div><div style="font-size:12px;color:var(--o);margin-top:2px">⚠️ '+b.caution+'</div></div>';
+    html += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:6px">';
+    foodList.forEach(f => {
+      html += '<div style="background:var(--card);border-radius:12px;padding:10px 8px;text-align:center;border-left:3px solid var(--g)">'
+        +'<div style="font-size:20px;margin-bottom:2px">🌿</div>'
+        +'<div style="font-size:13px;font-weight:600;margin-bottom:3px">'+f.food+'</div>'
+        +'<span style="font-size:10px;background:rgba(0,0,0,.06);padding:1px 6px;border-radius:8px">性'+f.nature+'</span>'
+        +'<div style="font-size:11px;color:var(--g);font-weight:500;margin-top:4px">'+f.action+'</div>'
+        +'<div style="font-size:10px;color:var(--s);margin-top:2px;line-height:1.4">'+f.note+'</div>'
+        +'</div>';
     });
-    teaList.forEach(t => {
-      html += '<div class="tcm-item"><div class="tcm-food">🍵 '+t.name+' <span style="font-size:11px;background:rgba(0,0,0,.06);padding:1px 6px;border-radius:10px;margin-left:6px">性'+t.nature+'</span></div><div style="font-size:12px;color:var(--s)">'+t.effects.slice(0,4).join('·')+'</div><div style="font-size:12px;color:var(--o);margin-top:2px">⚠️ '+t.caution+'</div></div>';
-    });
+    html += '</div>';
   }
 
+  // === Tea recommendations — 3-col cards ===
+  html += '<div class="st">🍵 茶饮推荐</div>';
+  const blendList = Object.values(blends).slice(0, 6);
+  const teaList = Object.values(teas).slice(0, 6);
+  if (blendList.length === 0 && teaList.length === 0) html += '<div class="card" style="color:var(--s);text-align:center">暂无匹配茶饮</div>';
+  else {
+    html += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:6px">';
+    // blends first
+    blendList.forEach(b => {
+      html += '<div style="background:var(--card);border-radius:12px;padding:10px 8px;text-align:center;border-left:3px solid var(--p)">'
+        +'<div style="font-size:20px;margin-bottom:2px">🍵</div>'
+        +'<div style="font-size:12px;font-weight:600;margin-bottom:2px">'+b.name+'</div>'
+        +'<div style="font-size:10px;color:var(--s);margin-bottom:3px">'+b.ingredients.join('+')+'</div>'
+        +'<span style="font-size:10px;background:rgba(175,82,222,.08);color:var(--p);padding:1px 6px;border-radius:8px">搭配</span>'
+        +'<div style="font-size:10px;color:var(--g);margin-top:4px;line-height:1.3">✅ '+b.for+'</div>'
+        +'<div style="font-size:10px;color:var(--o);margin-top:2px;line-height:1.3">⚠️ '+b.caution+'</div>'
+        +'</div>';
+    });
+    // single teas
+    teaList.forEach(t => {
+      html += '<div style="background:var(--card);border-radius:12px;padding:10px 8px;text-align:center;border-left:3px solid var(--b)">'
+        +'<div style="font-size:20px;margin-bottom:2px">🍵</div>'
+        +'<div style="font-size:12px;font-weight:600;margin-bottom:3px">'+t.name+'</div>'
+        +'<span style="font-size:10px;background:rgba(0,0,0,.06);padding:1px 6px;border-radius:8px">性'+t.nature+'</span>'
+        +'<div style="font-size:10px;color:var(--s);margin-top:4px;line-height:1.4">'+t.effects.slice(0,4).join('·')+'</div>'
+        +'<div style="font-size:10px;color:var(--o);margin-top:2px;line-height:1.3">⚠️ '+t.caution+'</div>'
+        +'</div>';
+    });
+    html += '</div>';
+  }
+
+  // === Acupressure — 3-col cards ===
   html += '<div class="st">💆 穴位按摩 · 经络推拿</div>';
-  const pointList = Object.values(points).slice(0, 6);
+  const pointList = Object.values(points).slice(0, 9);
   if (pointList.length === 0) html += '<div class="card" style="color:var(--s);text-align:center">暂无匹配穴位</div>';
-  else pointList.forEach(p => {
-    html += '<div class="tcm-item"><div class="tcm-food">📍 '+p.point+' <span style="font-size:10px;color:var(--s);margin-left:4px">'+p.meridian+'</span></div><div style="font-size:12px;color:var(--s);margin-bottom:4px">位置：'+p.loc+'</div><div style="font-size:12px;color:var(--g)">手法：'+p.tech+'</div></div>';
-  });
+  else {
+    html += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:6px">';
+    pointList.forEach(p => {
+      html += '<div style="background:var(--card);border-radius:12px;padding:10px 8px;text-align:center;border-left:3px solid var(--o)">'
+        +'<div style="font-size:20px;margin-bottom:2px">📍</div>'
+        +'<div style="font-size:12px;font-weight:600;margin-bottom:2px">'+p.point+'</div>'
+        +'<span style="font-size:10px;background:rgba(0,0,0,.06);padding:1px 6px;border-radius:8px">'+p.meridian+'</span>'
+        +'<div style="font-size:10px;color:var(--s);margin-top:4px;line-height:1.3">'+p.loc+'</div>'
+        +'<div style="font-size:10px;color:var(--g);margin-top:2px;line-height:1.3">'+p.tech+'</div>'
+        +'</div>';
+    });
+    html += '</div>';
+  }
 
   recEl.innerHTML = html;
 }
