@@ -373,11 +373,11 @@ function renderTCM() {
 
   const recEl = document.getElementById('tcm-recommendations');
   if (tcmSelected.size === 0) {
-    recEl.innerHTML = tabBar + tagHtml + '<div class="card" style="text-align:center;color:var(--s);padding:24px">👆 点击上方症状标签<br>获取食疗·茶饮·穴位推荐</div>';
+    recEl.innerHTML = tabBar + '<div class="card" style="text-align:center;color:var(--s);padding:24px">👆 点击上方症状标签<br>获取食疗·茶饮·穴位推荐</div>';
     return;
   }
 
-  let html = tabBar + tagHtml;
+  let html = tabBar;
   const foods = {}; const teas = {}; const points = {}; const blends = {};
   const allKW = buildKeywordMap();
 
