@@ -1073,11 +1073,10 @@ async function saveEdit() {
 // ─── Diet ───
 function renderDiet() {
   const covered = new Set(meals.flatMap(e => e.food_groups || []));
-  const daily = FG_DAILY;
-  const weekly = FG_WEEKLY;
-  const limited = FG_LIMIT;
+  const diet = DIETS[dietMode];
+  const daily = diet.daily; const weekly = diet.weekly; const limited = diet.limited;
   const cc = daily.filter(t => covered.has(t)).length;
-  const vegCount = FG_VEG.filter(k => covered.has(k)).length;
+  const vegCount = FG_VEG.filter(k => covered.has(k) && daily.includes(k)).length;
   const pct = cc / daily.length;
   const ringP = 2*Math.PI*15.5;
 
@@ -1086,27 +1085,43 @@ function renderDiet() {
   // date header
   h += `<div class="card flex"><button class="btn" onclick="shiftDiet(-1)">‹</button><span style="font-weight:600">${fmtDate(dietDate)}</span><button class="btn" onclick="shiftDiet(1)">›</button><button style="font-size:13px;color:var(--g);background:none;border:none;cursor:pointer;padding:4px 8px" onclick="dietDate=new Date();loadMeals().then(renderDiet)">今天</button></div>`;
 
-  // progress
-  h += `<div class="card" style="display:flex;align-items:center;gap:16px"><div class="ring" style="width:64px;height:64px"><svg viewBox="0 0 36 36" width="64" height="64"><circle class="ring-bg" cx="18" cy="18" r="15.5"/><circle class="ring-fg" cx="18" cy="18" r="15.5" stroke-dasharray="${ringP}" stroke-dashoffset="${ringP*(1-pct)}"/></svg><div class="ring-t" style="font-size:14px">${Math.round(pct*100)}%</div></div><div style="flex:1"><div style="font-weight:600">每日核心食物</div><div style="font-size:13px;color:var(--s)">已覆盖 ${cc}/${daily.length} 类 · 蔬菜 ${vegCount}/5 种</div></div></div>`;
+  // diet switcher tabs
+  h += '<div style="display:flex;gap:4px;margin-bottom:10px">';
+  Object.entries(DIETS).forEach(([k,v]) => {
+    const sel = k===dietMode;
+    const dCov = v.daily.filter(t => covered.has(t)).length;
+    h += '<button onclick="dietMode=\''+k+'\';renderDiet()" style="flex:1;padding:8px 4px;border-radius:8px;border:1.5px solid '+(sel?'var(--g)':'var(--sep)')+';background:'+(sel?'rgba(52,199,89,.08)':'#fff')+';cursor:pointer;font-size:12px;line-height:1.3">'+v.em+' '+v.name+'<br><span style="font-size:10px;color:'+(sel?'var(--g)':'var(--s)')+'">'+dCov+'/'+v.daily.length+' 类</span></button>';
+  });
+  h += '</div>';
 
-  // daily checklist
-  h += `<div class="st">🥇 每日核心食物</div><div class="grid2">${daily.map(k=>{
-    const info = FG[k];
-    const ok = covered.has(k);
-    return `<div class="chk"><span style="color:${ok?'var(--g)':'#C7C7CC'}">${ok?'✅':'⭕'}</span><div><div class="nm">${info.em} ${info.nm}</div><div class="fq">${info.fq}</div></div></div>`;
+  // progress
+  h += `<div class="card" style="display:flex;align-items:center;gap:16px"><div class="ring" style="width:64px;height:64px"><svg viewBox="0 0 36 36" width="64" height="64"><circle class="ring-bg" cx="18" cy="18" r="15.5"/><circle class="ring-fg" cx="18" cy="18" r="15.5" stroke-dasharray="${ringP}" stroke-dashoffset="${ringP*(1-pct)}"/></svg><div class="ring-t" style="font-size:14px">${Math.round(pct*100)}%</div></div><div style="flex:1"><div style="font-weight:600">${diet.em} ${diet.name}</div><div style="font-size:13px;color:var(--s)">已覆盖 ${cc}/${daily.length} 类 · 蔬菜 ${vegCount}/5 种</div><div style="font-size:11px;color:var(--s);margin-top:2px">${diet.desc}</div></div></div>`;
+
+  // daily checklist — 3 per row
+  h += `<div class="st">🥇 每日核心食物</div><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:12px">${daily.map(k=>{
+    const info = FG[k]; const ok = covered.has(k);
+    return `<div class="chk" style="flex-direction:column;align-items:center;gap:2px;padding:8px 6px;text-align:center"><div style="font-size:20px">${ok?'✅':'⭕'}</div><div class="nm" style="font-size:12px">${info.em} ${info.nm}</div><div class="fq" style="font-size:10px">${info.fq}</div></div>`;
   }).join('')}</div>`;
 
-  // weekly with frequency subtitle
+  // weekly
   h += `<div class="st">📆 适量摄入</div><div class="fbar">${weekly.map(k=>{
     const info = FG[k]; const ok = covered.has(k);
     return `<div class="fitem"><div style="font-size:22px;opacity:${ok?1:.4}">${info.em}</div><div class="nm" style="color:${ok?'var(--t)':'var(--s)'}">${info.nm}</div><div style="font-size:10px;color:var(--s);margin-top:1px">${info.fq}</div></div>`;
   }).join('')}</div>`;
 
-  // limited warning
+  // limited
   const lim = limited.filter(k=>covered.has(k));
   if (lim.length) {
     h += `<div class="card" style="border-left:4px solid var(--o)"><div style="color:var(--o);font-weight:600;font-size:13px">⚠️ 限食</div><div style="margin-top:4px">${lim.map(k=>FG[k].em+' '+FG[k].nm).join(' ')}</div></div>`;
   }
+
+  // cross-diet summary — show coverage across all three diets
+  h += '<div class="card" style="margin-top:10px"><div style="font-weight:600;font-size:13px;margin-bottom:6px">📊 三类饮食结构覆盖</div>';
+  Object.entries(DIETS).forEach(([k,v]) => {
+    const cov = v.daily.filter(t => covered.has(t)).length;
+    h += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px"><span style="font-size:14px;width:22px">'+v.em+'</span><span style="font-size:11px;width:50px;color:var(--s)">'+v.name+'</span><div class="bar" style="flex:1;height:12px"><div class="bar-f" style="width:'+(cov/v.daily.length*100)+'%;background:'+(k===dietMode?'var(--g)':'#C7C7CC')+';border-radius:2px"></div></div><span style="font-size:11px;font-weight:600;width:28px;color:'+(k===dietMode?'var(--g)':'var(--s)')+'">'+cov+'/'+v.daily.length+'</span></div>';
+  });
+  h += '</div>';
 
   // meal entries
   h += `<div class="st">📋 餐食记录</div>`;
@@ -1170,9 +1185,8 @@ function showLogMeal() {
 }
 
 function renderLogForm() {
-  const daily = FG_DAILY;
-  const weekly = FG_WEEKLY;
-  const limited = FG_LIMIT;
+  const diet = DIETS[dietMode];
+  const daily = diet.daily; const weekly = diet.weekly; const limited = diet.limited;
 
   function fgBtns(grps,label) {
     return `<div style="font-size:13px;font-weight:600;color:var(--s);margin:12px 0 4px">${label}</div><div class="fgrid">${grps.map(k=>{
@@ -1253,22 +1267,17 @@ function showTeaGuide() {
 }
 
 function showMedGuide() {
-  const daily = FG_DAILY;
-  const weekly = FG_WEEKLY;
-  const limited = FG_LIMIT;
-
-  function cards(grps) {
-    return grps.map(k => {
+  function dietSection(diet) {
+    const cards = (grps) => grps.map(k => {
       const info = FG[k];
       return `<div class="card"><div style="font-weight:600">${info.em} ${info.nm}</div><div style="font-size:12px;color:var(--s)">${info.fq}</div><div style="font-size:13px;color:var(--t);margin:4px 0">${info.ds}</div><div style="display:flex;flex-wrap:wrap;gap:4px">${info.ex.map(e=>`<span style="font-size:11px;background:#F2F2F7;padding:2px 6px;border-radius:4px">${e}</span>`).join('')}</div></div>`;
     }).join('');
+    return `<div style="margin-bottom:20px"><div style="text-align:center;padding:16px;background:var(--card);border-radius:14px;margin-bottom:10px"><h3>${diet.em} ${diet.name}</h3><p style="font-size:12px;color:var(--s)">${diet.desc}</p></div>`
+      +`<div class="st">🥇 每日核心 (${diet.daily.length}类)</div>${cards(diet.daily)}`
+      +`<div class="st">📆 适量摄入 (${diet.weekly.length}类)</div>${cards(diet.weekly)}`
+      +`<div class="st">⚠️ 限制 (${diet.limited.length}类)</div>${cards(diet.limited)}</div>`;
   }
-
-  document.getElementById('med-body').innerHTML =
-    `<div style="text-align:center;padding:20px;background:var(--card);border-radius:14px;margin-bottom:16px"><h2>🫒 地中海饮食</h2><p style="font-size:13px;color:var(--s)">US News & World Report 最佳整体饮食模式</p></div>`
-    +`<div class="st">🥇 每日核心</div>${cards(daily)}`
-    +`<div class="st">📆 每周适量</div>${cards(weekly)}`
-    +`<div class="st">⚠️ 限制</div>${cards(limited)}`;
+  document.getElementById('med-body').innerHTML = dietSection(DIETS.med) + dietSection(DIETS.mind) + dietSection(DIETS.modern);
   document.getElementById('mod-med').style.display = 'flex';
 }
 
@@ -1623,6 +1632,29 @@ const FG_DAILY  = Object.keys(FG).filter(k => FG[k].cat === 'veg' || FG[k].cat =
 const FG_WEEKLY = Object.keys(FG).filter(k => FG[k].cat === 'weekly'); // 4 items
 const FG_LIMIT  = Object.keys(FG).filter(k => FG[k].cat === 'limited'); // 2 items
 const FG_VEG    = Object.keys(FG).filter(k => FG[k].cat === 'veg');     // 5 vegetable sub-types
+
+// Diet frameworks — each maps FG keys to diet-specific categories
+const DIETS = {
+  med: {
+    name:'地中海饮食', em:'🫒', desc:'US News #1 最佳饮食',
+    daily: FG_DAILY,  // 11 core items
+    weekly: FG_WEEKLY,
+    limited: FG_LIMIT,
+  },
+  mind: {
+    name:'MIND饮食', em:'🧠', desc:'延缓神经退行，护脑饮食',
+    daily: ['vegLeafy','vegCruciferous','vegFruit','vegRoot','vegAllium','fruits','wholeGrains','legumes','nuts','oliveOil'],
+    weekly: ['fish','poultry','eggs'],
+    limited: ['redMeat','sweets','dairy'],
+  },
+  modern: {
+    name:'现代健康饮食', em:'💪', desc:'均衡营养，灵活搭配',
+    daily: ['vegLeafy','vegCruciferous','vegFruit','vegRoot','vegAllium','fruits','wholeGrains','legumes','nuts','oliveOil','herbs'],
+    weekly: ['fish','poultry','eggs','dairy'],
+    limited: ['redMeat','sweets'],
+  },
+};
+let dietMode = 'med'; // 'med' | 'mind' | 'modern'
 
 // ─── AI Food Classifier: keyword → FG key ───
 const FOOD_KW = {
