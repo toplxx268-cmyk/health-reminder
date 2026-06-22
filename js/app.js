@@ -1628,8 +1628,8 @@ const FG_ALL = Object.keys(FG);
 const DIETS = {
 	  modern: {
 	    name:'MODERN饮食', em:'💪', desc:'精准量化，抗衰延寿',
-	    daily: ['oliveOil','leafyGreens','berries','rootVeg','eggs','poultry','wholeGrains','nuts'],
-	    weekly: ['fish','legumes','dairy'],
+	    daily: ['oliveOil','leafyGreens','berries','rootVeg','eggs','poultry'],
+	    weekly: [],
 	    limited: ['sweets'],
 	    fq: {
 	      oliveOil:'每天 >10g · 必吃',
@@ -1638,14 +1638,10 @@ const DIETS = {
 	      rootVeg:'每天 ≤0.75 份 · 土豆等',
 	      eggs:'每天 0.5–1 个',
 	      poultry:'每天 ≤0.5 份 · 禽肉',
-	      wholeGrains:'每天 3–5 份',
-	      nuts:'每天 1 小把',
-	      fish:'每周 ≥2 次',
-	      legumes:'每周 2–3 次',
-	      dairy:'适量 · 低脂奶制品',
 	      sweets:'含糖饮料 · 完全不喝',
 	    },
 	  },
+
   med: {
     name:'地中海饮食', em:'🫒', desc:'严格9类全覆盖',
     daily: ['vegetables','fruits','wholeGrains','oliveOil','nuts'],
